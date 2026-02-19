@@ -12,8 +12,8 @@ export default defineConfig({
         name: "Agenda",
         short_name: "Agenda",
         description: "Tu tiempo, tu orden",
-        theme_color: "#0f0e09",
-        background_color: "#0f0e09",
+        theme_color: "#f5f0e8",
+        background_color: "#f5f0e8",
         display: "standalone",
         icons: [
           { src: "icon-192.png", sizes: "192x192", type: "image/png" },

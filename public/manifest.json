@@ -4,8 +4,8 @@
   "description": "Tu tiempo, tu orden",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f0e09",
-  "theme_color": "#0f0e09",
+  "background_color": "#f5f0e8",
+  "theme_color": "#f5f0e8",
   "orientation": "portrait",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
