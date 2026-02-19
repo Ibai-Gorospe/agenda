@@ -1,0 +1,68 @@
+# PROMPT PARA CLAUDE CODE EN VS CODE
+# Copia todo esto y pégalo en el chat de Claude en VS Code
+
+Tengo una carpeta llamada "agenda" con el código de una app React completa de gestión de tareas y calendario. Necesito que la pongas en marcha y la prepares para desplegar en Vercel como PWA instalable en móvil.
+
+La estructura de la carpeta ya existe con todos los archivos. Necesito que hagas lo siguiente:
+
+## 1. Instalar dependencias
+Ejecuta en la carpeta del proyecto:
+```
+npm install
+```
+
+## 2. Generar los iconos PWA
+Necesito dos iconos para que la app se pueda instalar como PWA. Genera dos archivos PNG con un fondo negro (#0f0e09) y el símbolo ◈ en color dorado (#ffd700) centrado:
+- `public/icon-192.png` (192x192 px)
+- `public/icon-512.png` (512x512 px)
+
+Puedes generarlos con un script Node.js usando canvas o sharp, o cualquier método que funcione.
+
+## 3. Crear el archivo .env
+Crea un archivo `.env` en la raíz del proyecto copiando `.env.example`. Déjalo con los valores de ejemplo por ahora — el usuario los rellenará con sus claves de Supabase.
+
+## 4. Verificar que arranca en local
+Ejecuta `npm run dev` y confirma que no hay errores de compilación. Si hay algún error, corrígelo.
+
+## 5. Preparar para Vercel
+Confirma que existe el archivo `vercel.json` en la raíz con el contenido correcto para SPA routing.
+
+## 6. Instrucciones para el usuario
+Al terminar, dame instrucciones paso a paso para:
+
+### Paso A — Crear cuenta en Supabase (gratis)
+1. Ir a supabase.com y crear cuenta gratuita
+2. Crear un nuevo proyecto (elegir región Europa)
+3. Ir a "SQL Editor" y ejecutar el contenido del archivo `supabase_setup.sql`
+4. Ir a Project Settings → API y copiar:
+   - Project URL → va en VITE_SUPABASE_URL del .env
+   - anon/public key → va en VITE_SUPABASE_ANON_KEY del .env
+5. En Supabase ir a Authentication → URL Configuration y añadir la URL de Vercel cuando la tengamos
+
+### Paso B — Desplegar en Vercel (gratis)
+1. Ir a vercel.com y crear cuenta gratuita (puede entrar con GitHub)
+2. Crear un repositorio en GitHub con la carpeta del proyecto
+3. En Vercel → "Add New Project" → importar el repositorio de GitHub
+4. En la configuración del proyecto en Vercel, ir a Settings → Environment Variables y añadir:
+   - VITE_SUPABASE_URL
+   - VITE_SUPABASE_ANON_KEY
+5. Hacer deploy
+6. Copiar la URL de Vercel (tipo miagenda.vercel.app) y añadirla en Supabase → Authentication → URL Configuration
+
+### Paso C — Instalar en el móvil como app
+- **Android (Chrome)**: Abrir la URL en Chrome → menú ⋮ → "Añadir a pantalla de inicio"
+- **iPhone (Safari)**: Abrir la URL en Safari → botón compartir → "Añadir a pantalla de inicio"
+
+---
+
+Aquí está la estructura de archivos que ya tengo:
+- `src/App.jsx` — componente principal con toda la lógica
+- `src/supabase.js` — cliente de Supabase
+- `src/main.jsx` — punto de entrada React
+- `index.html` — HTML con meta tags PWA
+- `public/manifest.json` — manifiesto PWA
+- `package.json` — dependencias
+- `vite.config.js` — configuración Vite + PWA plugin
+- `vercel.json` — configuración Vercel
+- `.env.example` — plantilla de variables de entorno
+- `supabase_setup.sql` — SQL para crear la tabla en Supabase
