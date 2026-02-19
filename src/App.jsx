@@ -961,10 +961,9 @@ export default function App() {
   if (user === undefined) return (
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center",
       justifyContent: "center", background: T.bgPage }}>
-      <div style={{ width: "48px", height: "48px", borderRadius: "14px",
-        background: T.accentGrad, display: "flex", alignItems: "center",
-        justifyContent: "center", fontSize: "1.5rem",
-        boxShadow: "0 4px 16px rgba(240,180,41,.4)" }}>📅</div>
+      <img src="/icon-192.png" alt="Agenda" style={{
+        width: "48px", height: "48px", borderRadius: "14px",
+        boxShadow: "0 4px 16px rgba(240,180,41,.4)" }} />
     </div>
   );
 
@@ -1000,12 +999,10 @@ export default function App() {
         boxShadow: "0 1px 8px rgba(0,0,0,.05)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
-          <div style={{
+          <img src="/icon-192.png" alt="Agenda" style={{
             width: "36px", height: "36px", borderRadius: "10px",
-            background: T.accentGrad, display: "flex", alignItems: "center",
-            justifyContent: "center", fontSize: "1.1rem",
             boxShadow: "0 2px 8px rgba(240,180,41,.3)",
-          }}>📅</div>
+          }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: ".95rem", color: T.text }}>Agenda</div>
             <div style={{ fontSize: ".72rem", color: T.textMuted }}>

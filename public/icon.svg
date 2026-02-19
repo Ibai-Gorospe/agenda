@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="115" fill="#faf7f0"/>
+
+  <!-- Row 1 - completed task -->
+  <circle cx="142" cy="170" r="44" fill="white" stroke="#f0b429" stroke-width="8"/>
+  <path d="M124 170 L138 184 L162 156" stroke="#f0b429" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="210" y="148" width="168" height="44" rx="22" fill="#f0b429" opacity=".18"/>
+  <!-- strikethrough -->
+  <rect x="210" y="168" width="168" height="10" rx="5" fill="#f0b429" opacity=".35"/>
+
+  <!-- Row 2 - completed task -->
+  <circle cx="142" cy="268" r="44" fill="white" stroke="#f0b429" stroke-width="8"/>
+  <path d="M124 268 L138 282 L162 254" stroke="#f0b429" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="210" y="246" width="130" height="44" rx="22" fill="#f0b429" opacity=".18"/>
+  <rect x="210" y="266" width="130" height="10" rx="5" fill="#f0b429" opacity=".35"/>
+
+  <!-- Row 3 - pending task -->
+  <circle cx="142" cy="366" r="44" fill="white" stroke="#f0b429" stroke-width="8" opacity=".45"/>
+  <rect x="210" y="344" width="155" height="44" rx="22" fill="#f0b429" opacity=".1"/>
+</svg>
