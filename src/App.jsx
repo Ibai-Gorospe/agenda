@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabase";
 
 // ─── Theme: warm cream + golden yellow, light mode ───────────────────────────
@@ -102,7 +102,7 @@ async function fetchTasks(userId) {
   const map = {};
   for (const t of data) {
     if (!map[t.date]) map[t.date] = [];
-    map[t.date].push({ id: t.id, text: t.text, time: t.time, reminder: t.reminder, done: t.done });
+    map[t.date].push({ id: t.id, text: t.text, time: t.time, reminder: t.reminder, done: t.done, position: t.position ?? 0 });
   }
   return map;
 }
@@ -111,6 +111,7 @@ async function upsertTask(userId, date, task) {
     id: task.id, user_id: userId, date,
     text: task.text, time: task.time || null,
     reminder: task.reminder || "0", done: task.done,
+    position: task.position ?? 0,
   });
 }
 async function deleteTask(taskId) {
@@ -267,7 +268,7 @@ function TaskModal({ date, task, onSave, onClose }) {
 
   const save = () => {
     if (!text.trim()) return;
-    onSave({ ...task, text: text.trim(), time, reminder, done: task?.done || false, id: task?.id || crypto.randomUUID() });
+    onSave({ ...task, text: text.trim(), time, reminder, done: task?.done || false, position: task?.position ?? 0, id: task?.id || crypto.randomUUID() });
     onClose();
   };
 
@@ -342,20 +343,149 @@ function TaskModal({ date, task, onSave, onClose }) {
   );
 }
 
+// ─── MoveTaskPicker ──────────────────────────────────────────────────────────
+function MoveTaskPicker({ currentDate, onMove, onClose }) {
+  const [targetDate, setTargetDate] = useState(currentDate);
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
+      zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center",
+    }}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{
+        background: T.bgModal, borderRadius: "24px 24px 0 0",
+        padding: "1.5rem 1.5rem 2.5rem", width: "100%", maxWidth: "500px",
+        boxShadow: T.shadowFloat,
+      }}>
+        <div style={{ width: "36px", height: "4px", background: T.borderGray,
+          borderRadius: "2px", margin: "0 auto 1.2rem" }} />
+        <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1.2rem",
+          color: T.accent }}>Mover tarea</h3>
+        <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
+          style={{
+            width: "100%", padding: ".8rem 1rem", background: T.bg,
+            border: `1.5px solid ${T.borderGray}`, borderRadius: "12px",
+            color: T.text, fontSize: "1rem", outline: "none",
+          }} />
+        <div style={{ display: "flex", gap: ".75rem", marginTop: "1rem" }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: ".85rem", background: T.bg, border: "none",
+            borderRadius: "12px", color: T.textSub, fontWeight: 600,
+            fontSize: ".95rem", cursor: "pointer",
+          }}>Cancelar</button>
+          <button onClick={() => { onMove(targetDate); onClose(); }} style={{
+            flex: 2, padding: ".85rem", background: T.accentGrad, border: "none",
+            borderRadius: "12px", color: T.textOnAccent, fontWeight: 700,
+            fontSize: ".95rem", cursor: "pointer",
+            boxShadow: "0 4px 16px rgba(240,180,41,.35)",
+          }}>Mover</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── DayView ──────────────────────────────────────────────────────────────────
-function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete }) {
-  const dayTasks = [...(tasks[date] || [])].sort((a, b) => {
-    if (!a.time && !b.time) return 0;
-    if (!a.time) return 1; if (!b.time) return -1;
-    return a.time.localeCompare(b.time);
-  });
+function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTask, onReorder }) {
+  const dayTasks = [...(tasks[date] || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const isToday = date === todayStr();
   const weekend = isWeekend(date);
   const pending = dayTasks.filter(t => !t.done).length;
   const done = dayTasks.filter(t => t.done).length;
 
+  // ── Drag & drop state ──
+  const dragRef = useRef({ active: false, id: null, startY: 0, currentY: 0, timer: null, el: null });
+  const listRef = useRef(null);
+  const [dragId, setDragId] = useState(null);
+  const [dragOffset, setDragOffset] = useState(0);
+
+  const handleTouchStart = (e, taskId) => {
+    const touch = e.touches[0];
+    const el = e.currentTarget;
+    dragRef.current.timer = setTimeout(() => {
+      dragRef.current = { active: true, id: taskId, startY: touch.clientY, currentY: touch.clientY, el };
+      setDragId(taskId);
+      setDragOffset(0);
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 200);
+    dragRef.current.startY = touch.clientY;
+  };
+
+  const handleTouchMove = (e) => {
+    if (dragRef.current.timer && Math.abs(e.touches[0].clientY - dragRef.current.startY) > 10) {
+      clearTimeout(dragRef.current.timer);
+      dragRef.current.timer = null;
+    }
+    if (!dragRef.current.active) return;
+    e.preventDefault();
+    const y = e.touches[0].clientY;
+    dragRef.current.currentY = y;
+    setDragOffset(y - dragRef.current.startY);
+  };
+
+  const handleTouchEnd = () => {
+    if (dragRef.current.timer) { clearTimeout(dragRef.current.timer); dragRef.current.timer = null; }
+    if (!dragRef.current.active) return;
+    // Calculate new index based on offset
+    const cards = listRef.current?.children;
+    if (cards) {
+      const oldIdx = dayTasks.findIndex(t => t.id === dragRef.current.id);
+      let newIdx = oldIdx;
+      const cardH = cards[0]?.offsetHeight + 10 || 70;
+      const moved = Math.round(dragOffset / cardH);
+      newIdx = Math.max(0, Math.min(dayTasks.length - 1, oldIdx + moved));
+      if (newIdx !== oldIdx) {
+        const reordered = [...dayTasks];
+        const [item] = reordered.splice(oldIdx, 1);
+        reordered.splice(newIdx, 0, item);
+        onReorder(date, reordered);
+      }
+    }
+    dragRef.current = { active: false, id: null, startY: 0, currentY: 0, timer: null, el: null };
+    setDragId(null);
+    setDragOffset(0);
+  };
+
+  // Mouse drag support
+  const handleMouseDown = (e, taskId) => {
+    if (e.button !== 0) return;
+    const startY = e.clientY;
+    dragRef.current = { active: true, id: taskId, startY, currentY: startY, timer: null, el: e.currentTarget };
+    setDragId(taskId);
+    setDragOffset(0);
+
+    const onMouseMove = (ev) => {
+      ev.preventDefault();
+      setDragOffset(ev.clientY - startY);
+      dragRef.current.currentY = ev.clientY;
+    };
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      // reuse touch end logic
+      const cards = listRef.current?.children;
+      if (cards) {
+        const oldIdx = dayTasks.findIndex(t => t.id === dragRef.current.id);
+        const cardH = cards[0]?.offsetHeight + 10 || 70;
+        const moved = Math.round((dragRef.current.currentY - startY) / cardH);
+        const newIdx = Math.max(0, Math.min(dayTasks.length - 1, oldIdx + moved));
+        if (newIdx !== oldIdx) {
+          const reordered = [...dayTasks];
+          const [item] = reordered.splice(oldIdx, 1);
+          reordered.splice(newIdx, 0, item);
+          onReorder(date, reordered);
+        }
+      }
+      dragRef.current = { active: false, id: null, startY: 0, currentY: 0, timer: null, el: null };
+      setDragId(null);
+      setDragOffset(0);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
+
   return (
-    <div style={{ padding: "1.25rem 1rem 2rem", maxWidth: "600px", margin: "0 auto" }}>
+    <div style={{ padding: "1.25rem 1rem 2rem", maxWidth: "600px", margin: "0 auto" }}
+      onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
       {/* Day header card */}
       <div style={{
         background: weekend
@@ -417,65 +547,91 @@ function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete }) {
       )}
 
       {/* Task list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: "1rem" }}>
-        {dayTasks.map(task => (
-          <div key={task.id} className="task-card" style={{
-            background: task.done ? T.doneBg : T.bgCard,
-            border: `1.5px solid ${T.borderGray}`,
-            borderRadius: "16px", padding: "1rem 1.1rem",
-            display: "flex", alignItems: "flex-start", gap: ".85rem",
-            boxShadow: task.done ? "none" : T.shadowCard,
-            transition: "all .2s",
-          }}>
-            {/* Checkbox */}
-            <button onClick={() => onToggle(date, task.id)} style={{
-              width: "24px", height: "24px", borderRadius: "8px", flexShrink: 0,
-              border: `2px solid ${task.done ? T.accent : T.borderGray}`,
-              background: task.done ? T.accentGrad : "transparent",
-              cursor: "pointer", display: "flex", alignItems: "center",
-              justifyContent: "center", marginTop: ".1rem", transition: "all .15s",
+      <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: "1rem" }}>
+        {dayTasks.map(task => {
+          const isDragging = dragId === task.id;
+          return (
+            <div key={task.id} className={isDragging ? "" : "task-card"} style={{
+              background: task.done ? T.doneBg : T.bgCard,
+              border: `1.5px solid ${isDragging ? T.accent : T.borderGray}`,
+              borderRadius: "16px", padding: ".85rem 1rem",
+              display: "flex", alignItems: "flex-start", gap: ".7rem",
+              boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,.15)" : (task.done ? "none" : T.shadowCard),
+              transition: isDragging ? "none" : "all .2s",
+              transform: isDragging ? `translateY(${dragOffset}px)` : "none",
+              zIndex: isDragging ? 50 : 1,
+              position: "relative",
+              opacity: isDragging ? .9 : 1,
             }}>
-              {task.done && <span style={{ color: "#fff", fontSize: ".7rem", fontWeight: 800 }}>✓</span>}
-            </button>
+              {/* Drag handle */}
+              <div
+                onTouchStart={e => handleTouchStart(e, task.id)}
+                onMouseDown={e => handleMouseDown(e, task.id)}
+                style={{
+                  width: "28px", minHeight: "36px", flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "grab", touchAction: "none", color: T.textMuted,
+                  fontSize: "1rem", userSelect: "none",
+                }}>⋮⋮</div>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{
-                color: task.done ? T.textMuted : T.text,
-                textDecoration: task.done ? "line-through" : "none",
-                fontSize: ".97rem", lineHeight: 1.4, wordBreak: "break-word",
-                margin: 0,
-              }}>{task.text}</p>
-              {task.time && (
-                <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".35rem" }}>
-                  <span style={{ fontSize: ".75rem" }}>🕐</span>
-                  <span style={{
-                    color: task.done ? T.textMuted : (weekend ? T.weekend : T.accent),
-                    fontSize: ".8rem", fontWeight: 600,
-                  }}>{task.time}</span>
-                  {task.reminder && task.reminder !== "0" && (
-                    <Badge color={weekend ? T.weekend : T.accentDark}
-                      bg={weekend ? T.weekendLight : T.accentLight}>
-                      {task.reminder >= 60 ? `${task.reminder / 60}h antes` : `${task.reminder}min antes`}
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
+              {/* Checkbox — 36x36 touch target */}
+              <button onClick={() => onToggle(date, task.id)} style={{
+                width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
+                border: `2.5px solid ${task.done ? T.accent : T.borderGray}`,
+                background: task.done ? T.accentGrad : "transparent",
+                cursor: "pointer", display: "flex", alignItems: "center",
+                justifyContent: "center", transition: "all .15s",
+              }}>
+                {task.done && <span style={{ color: "#fff", fontSize: ".85rem", fontWeight: 800 }}>✓</span>}
+              </button>
 
-            <div style={{ display: "flex", gap: ".25rem", flexShrink: 0 }}>
-              <button onClick={() => onEdit(date, task)} style={{
-                background: T.bg, border: "none", borderRadius: "8px",
-                color: T.textMuted, cursor: "pointer", fontSize: ".85rem",
-                padding: ".35rem .4rem", lineHeight: 1,
-              }}>✏️</button>
-              <button onClick={() => onDelete(date, task.id)} style={{
-                background: T.bg, border: "none", borderRadius: "8px",
-                color: T.textMuted, cursor: "pointer", fontSize: ".85rem",
-                padding: ".35rem .4rem", lineHeight: 1,
-              }}>🗑</button>
+              {/* Text — tap to toggle */}
+              <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
+                onClick={() => onToggle(date, task.id)}>
+                <p style={{
+                  color: task.done ? T.textMuted : T.text,
+                  textDecoration: task.done ? "line-through" : "none",
+                  fontSize: ".97rem", lineHeight: 1.4, wordBreak: "break-word",
+                  margin: 0,
+                }}>{task.text}</p>
+                {task.time && (
+                  <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".35rem" }}>
+                    <span style={{ fontSize: ".75rem" }}>🕐</span>
+                    <span style={{
+                      color: task.done ? T.textMuted : (weekend ? T.weekend : T.accent),
+                      fontSize: ".8rem", fontWeight: 600,
+                    }}>{task.time}</span>
+                    {task.reminder && task.reminder !== "0" && (
+                      <Badge color={weekend ? T.weekend : T.accentDark}
+                        bg={weekend ? T.weekendLight : T.accentLight}>
+                        {task.reminder >= 60 ? `${task.reminder / 60}h antes` : `${task.reminder}min antes`}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons — 36x36 each */}
+              <div style={{ display: "flex", gap: ".2rem", flexShrink: 0, alignItems: "flex-start" }}>
+                <button onClick={() => onMoveTask(date, task)} style={{
+                  width: "36px", height: "36px", background: T.bg, border: "none",
+                  borderRadius: "10px", color: T.textMuted, cursor: "pointer",
+                  fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>📅</button>
+                <button onClick={() => onEdit(date, task)} style={{
+                  width: "36px", height: "36px", background: T.bg, border: "none",
+                  borderRadius: "10px", color: T.textMuted, cursor: "pointer",
+                  fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>✏️</button>
+                <button onClick={() => onDelete(date, task.id)} style={{
+                  width: "36px", height: "36px", background: T.bg, border: "none",
+                  borderRadius: "10px", color: T.textMuted, cursor: "pointer",
+                  fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>🗑</button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Add button */}
@@ -708,6 +864,7 @@ export default function App() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [modal, setModal] = useState(null);
+  const [movePicker, setMovePicker] = useState(null);
   const today = todayStr();
 
   // Inject global CSS once
@@ -742,10 +899,18 @@ export default function App() {
   const persistTask = useCallback(async (date, task) => {
     const dayTasks = tasks[date] || [];
     const idx = dayTasks.findIndex(t => t.id === task.id);
-    const newDay = idx >= 0 ? dayTasks.map(t => t.id === task.id ? task : t) : [...dayTasks, task];
+    let savedTask;
+    let newDay;
+    if (idx >= 0) {
+      savedTask = { ...task, position: dayTasks[idx].position };
+      newDay = dayTasks.map(t => t.id === task.id ? savedTask : t);
+    } else {
+      savedTask = { ...task, position: dayTasks.length };
+      newDay = [...dayTasks, savedTask];
+    }
     setTasks(prev => ({ ...prev, [date]: newDay }));
-    if (user && !user.guest) await upsertTask(user.id, date, task);
-    scheduleNotification(task, date);
+    if (user && !user.guest) await upsertTask(user.id, date, savedTask);
+    scheduleNotification(savedTask, date);
   }, [tasks, user]);
 
   const handleToggle = useCallback(async (date, id) => {
@@ -759,6 +924,31 @@ export default function App() {
   const handleDelete = useCallback(async (date, id) => {
     setTasks(prev => ({ ...prev, [date]: (prev[date] || []).filter(t => t.id !== id) }));
     if (user && !user.guest) await deleteTask(id);
+  }, [user]);
+
+  const moveTask = useCallback(async (fromDate, toDate, taskId) => {
+    if (fromDate === toDate) return;
+    const task = (tasks[fromDate] || []).find(t => t.id === taskId);
+    if (!task) return;
+    const toLen = (tasks[toDate] || []).length;
+    setTasks(prev => {
+      const fromTasks = (prev[fromDate] || []).filter(t => t.id !== taskId);
+      const toTasks = [...(prev[toDate] || []), { ...task, position: toLen }];
+      return { ...prev, [fromDate]: fromTasks, [toDate]: toTasks };
+    });
+    if (user && !user.guest) {
+      await supabase.from("tasks").update({ date: toDate, position: toLen }).eq("id", taskId);
+    }
+  }, [tasks, user]);
+
+  const handleReorder = useCallback(async (date, reorderedTasks) => {
+    const withPositions = reorderedTasks.map((t, i) => ({ ...t, position: i }));
+    setTasks(prev => ({ ...prev, [date]: withPositions }));
+    if (user && !user.guest) {
+      await Promise.all(
+        withPositions.map(t => supabase.from("tasks").update({ position: t.position }).eq("id", t.id))
+      );
+    }
   }, [user]);
 
   const getWeekStart = (dateStr) => {
@@ -929,7 +1119,9 @@ export default function App() {
             onAddTask={() => setModal({ date: selectedDate })}
             onToggle={handleToggle}
             onEdit={(date, task) => setModal({ date, task })}
-            onDelete={handleDelete} />
+            onDelete={handleDelete}
+            onMoveTask={(date, task) => setMovePicker({ date, task })}
+            onReorder={handleReorder} />
         )}
         {activeView === "week" && (
           <WeekView startDate={getWeekStart(`${calYear}-${pad(calMonth + 1)}-01`)}
@@ -987,6 +1179,13 @@ export default function App() {
         <TaskModal date={modal.date} task={modal.task}
           onSave={(task) => persistTask(modal.date, task)}
           onClose={() => setModal(null)} />
+      )}
+
+      {movePicker && (
+        <MoveTaskPicker
+          currentDate={movePicker.date}
+          onMove={(toDate) => moveTask(movePicker.date, toDate, movePicker.task.id)}
+          onClose={() => setMovePicker(null)} />
       )}
     </div>
   );
