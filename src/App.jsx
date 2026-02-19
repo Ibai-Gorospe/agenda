@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 const T = {
@@ -47,7 +50,7 @@ async function fetchTasks(userId) {
   const map = {};
   for (const t of data) {
     if (!map[t.date]) map[t.date] = [];
-    map[t.date].push({ id: t.id, text: t.text, time: t.time, reminder: t.reminder, done: t.done });
+    map[t.date].push({ id: t.id, text: t.text, time: t.time, reminder: t.reminder, done: t.done, position: t.position ?? 0 });
   }
   return map;
 }
@@ -61,6 +64,7 @@ async function upsertTask(userId, date, task) {
     time: task.time || null,
     reminder: task.reminder || "0",
     done: task.done,
+    position: task.position ?? 0,
   });
 }
 
@@ -189,7 +193,7 @@ function TaskModal({ date, task, onSave, onClose }) {
 
   const save = () => {
     if (!text.trim()) return;
-    onSave({ ...task, text: text.trim(), time, reminder, done: task?.done || false, id: task?.id || crypto.randomUUID() });
+    onSave({ ...task, text: text.trim(), time, reminder, done: task?.done || false, position: task?.position ?? 0, id: task?.id || crypto.randomUUID() });
     onClose();
   };
 
@@ -253,15 +257,158 @@ function TaskModal({ date, task, onSave, onClose }) {
   );
 }
 
+// ─── MoveTaskPicker ──────────────────────────────────────────────────────────
+function MoveTaskPicker({ currentDate, onMove, onClose }) {
+  const [targetDate, setTargetDate] = useState(currentDate);
+  const inputStyle = {
+    width: "100%", padding: ".75rem", background: "rgba(255,215,0,.04)",
+    border: `1px solid ${T.border}`, borderRadius: ".7rem",
+    color: T.text, fontFamily: T.font, fontSize: ".95rem", outline: "none",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 100,
+      display: "flex", alignItems: "flex-end", justifyContent: "center",
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#141309", borderRadius: "1.5rem 1.5rem 0 0",
+        padding: "2rem", width: "100%", maxWidth: "500px",
+        border: `1px solid ${T.border}`, borderBottom: "none",
+      }}>
+        <h3 style={{ color: T.accent, margin: "0 0 1.2rem", fontFamily: T.font,
+          fontSize: "1.1rem", fontWeight: "400" }}>Mover tarea</h3>
+        <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
+          style={{ ...inputStyle, colorScheme: "dark" }} />
+        <div style={{ display: "flex", gap: ".8rem", marginTop: "1rem" }}>
+          <button onClick={onClose} style={btn({
+            flex: 1, padding: ".85rem", background: "rgba(255,215,0,.06)",
+            border: `1px solid ${T.borderFaint}`, borderRadius: ".8rem",
+            color: T.textMuted, fontSize: "1rem",
+          })}>Cancelar</button>
+          <button onClick={() => { onMove(targetDate); onClose(); }} style={btn({
+            flex: 2, padding: ".85rem", background: T.grad,
+            borderRadius: ".8rem", color: T.bg, fontSize: "1rem", fontWeight: "bold",
+          })}>Mover</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CarryOverDialog ─────────────────────────────────────────────────────────
+function CarryOverDialog({ count, onConfirm, onDismiss }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 100,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }} onClick={onDismiss}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#141309", borderRadius: "1.5rem",
+        padding: "2rem", width: "90%", maxWidth: "400px",
+        border: `1px solid ${T.border}`, textAlign: "center",
+      }}>
+        <div style={{ fontSize: "2rem", marginBottom: ".8rem" }}>&#128203;</div>
+        <h3 style={{ color: T.accent, fontFamily: T.font, fontWeight: "400",
+          fontSize: "1.1rem", margin: "0 0 .8rem" }}>Tareas pendientes</h3>
+        <p style={{ color: T.text, fontSize: ".92rem", margin: "0 0 1.5rem", lineHeight: 1.5 }}>
+          Tienes <strong style={{ color: T.accent }}>{count}</strong> tarea{count > 1 ? "s" : ""} sin completar de d&iacute;as anteriores. &iquest;Moverlas a hoy?
+        </p>
+        <div style={{ display: "flex", gap: ".8rem" }}>
+          <button onClick={onDismiss} style={btn({
+            flex: 1, padding: ".85rem", background: "rgba(255,215,0,.06)",
+            border: `1px solid ${T.borderFaint}`, borderRadius: ".8rem",
+            color: T.textMuted, fontSize: "1rem",
+          })}>No</button>
+          <button onClick={onConfirm} style={btn({
+            flex: 2, padding: ".85rem", background: T.grad,
+            borderRadius: ".8rem", color: T.bg, fontSize: "1rem", fontWeight: "bold",
+          })}>Mover a hoy</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SortableTaskItem ────────────────────────────────────────────────────────
+function SortableTaskItem({ task, date, onToggle, onEdit, onDelete, onMoveTask }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div style={{
+        background: task.done ? "rgba(255,215,0,.02)" : T.bgCard,
+        border: `1px solid ${task.done ? T.doneBorder : T.border}`,
+        borderRadius: "1rem", padding: "1rem 1.1rem",
+        display: "flex", alignItems: "flex-start", gap: ".6rem", transition: "all .2s",
+      }}>
+        <button {...listeners} style={btn({
+          background: "none", color: T.textMuted, fontSize: "1.1rem",
+          padding: ".1rem", cursor: "grab", touchAction: "none", flexShrink: 0, marginTop: ".1rem",
+        })}>&#8942;</button>
+        <button onClick={() => onToggle(date, task.id)} style={btn({
+          width: "22px", height: "22px", borderRadius: "50%", flexShrink: 0, marginTop: ".15rem",
+          border: `2px solid ${task.done ? T.accent : T.border}`,
+          background: task.done ? T.accent : "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        })}>
+          {task.done && <span style={{ color: T.bg, fontSize: ".7rem", fontWeight: "bold" }}>&#10003;</span>}
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{
+            color: task.done ? T.doneText : T.text, margin: 0,
+            textDecoration: task.done ? "line-through" : "none",
+            fontSize: "1rem", wordBreak: "break-word",
+          }}>{task.text}</p>
+          {task.time && (
+            <p style={{ color: task.done ? T.textFaint : T.accent, margin: ".3rem 0 0", fontSize: ".82rem" }}>
+              &#9201; {task.time}
+              {task.reminder && task.reminder !== "0"
+                ? ` \u00b7 aviso ${task.reminder >= 60 ? task.reminder / 60 + "h" : task.reminder + "min"} antes`
+                : ""}
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: ".3rem", flexShrink: 0 }}>
+          <button onClick={() => onMoveTask(date, task)} style={btn({
+            background: "none", color: T.textMuted, fontSize: ".95rem", padding: ".25rem",
+          })}>&#128197;</button>
+          <button onClick={() => onEdit(date, task)} style={btn({
+            background: "none", color: T.textMuted, fontSize: ".95rem", padding: ".25rem",
+          })}>&#9999;&#65039;</button>
+          <button onClick={() => onDelete(date, task.id)} style={btn({
+            background: "none", color: T.textMuted, fontSize: ".95rem", padding: ".25rem",
+          })}>&#128465;</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── DayView ─────────────────────────────────────────────────────────────────
-function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete }) {
-  const dayTasks = [...(tasks[date] || [])].sort((a, b) => {
-    if (!a.time && !b.time) return 0;
-    if (!a.time) return 1;
-    if (!b.time) return -1;
-    return a.time.localeCompare(b.time);
-  });
+function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTask, onReorder }) {
+  const dayTasks = [...(tasks[date] || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const isToday = date === todayStr();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = dayTasks.findIndex(t => t.id === active.id);
+    const newIndex = dayTasks.findIndex(t => t.id === over.id);
+    const reordered = arrayMove(dayTasks, oldIndex, newIndex);
+    onReorder(date, reordered);
+  };
 
   return (
     <div style={{ padding: "1.5rem 1rem", maxWidth: "600px", margin: "0 auto" }}>
@@ -276,59 +423,27 @@ function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete }) {
 
       {dayTasks.length === 0 && (
         <div style={{ textAlign: "center", padding: "3rem 1rem", color: T.textFaint }}>
-          <div style={{ fontSize: "2.5rem", marginBottom: ".8rem", opacity: .4 }}>◌</div>
-          <p style={{ fontSize: ".9rem" }}>Sin tareas para este día</p>
+          <div style={{ fontSize: "2.5rem", marginBottom: ".8rem", opacity: .4 }}>&#9724;</div>
+          <p style={{ fontSize: ".9rem" }}>Sin tareas para este d&iacute;a</p>
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: ".75rem", marginBottom: "1.5rem" }}>
-        {dayTasks.map(task => (
-          <div key={task.id} style={{
-            background: task.done ? "rgba(255,215,0,.02)" : T.bgCard,
-            border: `1px solid ${task.done ? T.doneBorder : T.border}`,
-            borderRadius: "1rem", padding: "1rem 1.1rem",
-            display: "flex", alignItems: "flex-start", gap: "1rem", transition: "all .2s",
-          }}>
-            <button onClick={() => onToggle(date, task.id)} style={btn({
-              width: "22px", height: "22px", borderRadius: "50%", flexShrink: 0, marginTop: ".15rem",
-              border: `2px solid ${task.done ? T.accent : T.border}`,
-              background: task.done ? T.accent : "transparent",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            })}>
-              {task.done && <span style={{ color: T.bg, fontSize: ".7rem", fontWeight: "bold" }}>✓</span>}
-            </button>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{
-                color: task.done ? T.doneText : T.text, margin: 0,
-                textDecoration: task.done ? "line-through" : "none",
-                fontSize: "1rem", wordBreak: "break-word",
-              }}>{task.text}</p>
-              {task.time && (
-                <p style={{ color: task.done ? T.textFaint : T.accent, margin: ".3rem 0 0", fontSize: ".82rem" }}>
-                  ⏱ {task.time}
-                  {task.reminder && task.reminder !== "0"
-                    ? ` · aviso ${task.reminder >= 60 ? task.reminder / 60 + "h" : task.reminder + "min"} antes`
-                    : ""}
-                </p>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: ".3rem", flexShrink: 0 }}>
-              <button onClick={() => onEdit(date, task)} style={btn({
-                background: "none", color: T.textMuted, fontSize: ".95rem", padding: ".25rem",
-              })}>✏️</button>
-              <button onClick={() => onDelete(date, task.id)} style={btn({
-                background: "none", color: T.textMuted, fontSize: ".95rem", padding: ".25rem",
-              })}>🗑</button>
-            </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={dayTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          <div style={{ display: "flex", flexDirection: "column", gap: ".75rem", marginBottom: "1.5rem" }}>
+            {dayTasks.map(task => (
+              <SortableTaskItem key={task.id} task={task} date={date}
+                onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onMoveTask={onMoveTask} />
+            ))}
           </div>
-        ))}
-      </div>
+        </SortableContext>
+      </DndContext>
 
       <button onClick={onAddTask} style={btn({
         width: "100%", padding: "1rem",
         background: T.accentBg, border: `1px dashed rgba(255,215,0,.35)`,
         borderRadius: "1rem", color: T.accent, fontSize: "1rem", letterSpacing: ".05em",
-      })}>+ Añadir tarea</button>
+      })}>+ A&ntilde;adir tarea</button>
     </div>
   );
 }
@@ -466,6 +581,9 @@ export default function App() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [modal, setModal] = useState(null);
+  const [movePicker, setMovePicker] = useState(null);
+  const [carryOverTasks, setCarryOverTasks] = useState([]);
+  const [carryOverShown, setCarryOverShown] = useState(false);
   const today = todayStr();
 
   // Auth state listener
@@ -491,13 +609,40 @@ export default function App() {
     if (supportsNotif && Notification.permission === "default") Notification.requestPermission();
   }, []);
 
+  // Carry-over: detect overdue incomplete tasks
+  useEffect(() => {
+    if (carryOverShown) return;
+    if (user === undefined) return;
+    const todayDate = todayStr();
+    const overdue = [];
+    for (const [date, dayTasks] of Object.entries(tasks)) {
+      if (date >= todayDate) continue;
+      for (const task of dayTasks) {
+        if (!task.done) overdue.push({ date, task });
+      }
+    }
+    if (overdue.length > 0) setCarryOverTasks(overdue);
+    const isGuest = user?.guest;
+    if (isGuest || Object.keys(tasks).length > 0 || user === null) {
+      setCarryOverShown(true);
+    }
+  }, [tasks, user, carryOverShown]);
+
   const persistTask = useCallback(async (date, task) => {
     const dayTasks = tasks[date] || [];
     const idx = dayTasks.findIndex(t => t.id === task.id);
-    const newDay = idx >= 0 ? dayTasks.map(t => t.id === task.id ? task : t) : [...dayTasks, task];
+    let savedTask;
+    let newDay;
+    if (idx >= 0) {
+      savedTask = { ...task, position: dayTasks[idx].position };
+      newDay = dayTasks.map(t => t.id === task.id ? savedTask : t);
+    } else {
+      savedTask = { ...task, position: dayTasks.length };
+      newDay = [...dayTasks, savedTask];
+    }
     setTasks(prev => ({ ...prev, [date]: newDay }));
-    if (user) await upsertTask(user.id, date, task);
-    scheduleNotification(task, date);
+    if (user && !user.guest) await upsertTask(user.id, date, savedTask);
+    scheduleNotification(savedTask, date);
   }, [tasks, user]);
 
   const handleToggle = useCallback(async (date, id) => {
@@ -506,12 +651,58 @@ export default function App() {
     const updated = { ...task, done: !task.done };
     const newDay = (tasks[date] || []).map(t => t.id === id ? updated : t);
     setTasks(prev => ({ ...prev, [date]: newDay }));
-    if (user) await upsertTask(user.id, date, updated);
+    if (user && !user.guest) await upsertTask(user.id, date, updated);
   }, [tasks, user]);
 
   const handleDelete = useCallback(async (date, id) => {
     setTasks(prev => ({ ...prev, [date]: (prev[date] || []).filter(t => t.id !== id) }));
-    if (user) await deleteTask(id);
+    if (user && !user.guest) await deleteTask(id);
+  }, [user]);
+
+  const moveTask = useCallback(async (fromDate, toDate, taskId) => {
+    if (fromDate === toDate) return;
+    const task = (tasks[fromDate] || []).find(t => t.id === taskId);
+    if (!task) return;
+    setTasks(prev => {
+      const fromTasks = (prev[fromDate] || []).filter(t => t.id !== taskId);
+      const toTasks = [...(prev[toDate] || [])];
+      toTasks.push({ ...task, position: toTasks.length });
+      return { ...prev, [fromDate]: fromTasks, [toDate]: toTasks };
+    });
+    if (user && !user.guest) {
+      await supabase.from("tasks").update({ date: toDate, position: (tasks[toDate] || []).length }).eq("id", taskId);
+    }
+  }, [tasks, user]);
+
+  const handleCarryOver = useCallback(async () => {
+    const todayDate = todayStr();
+    setTasks(prev => {
+      const next = { ...prev };
+      const todayList = [...(next[todayDate] || [])];
+      for (const { date, task } of carryOverTasks) {
+        next[date] = (next[date] || []).filter(t => t.id !== task.id);
+        todayList.push({ ...task, position: todayList.length });
+      }
+      next[todayDate] = todayList;
+      return next;
+    });
+    if (user && !user.guest) {
+      const ids = carryOverTasks.map(({ task }) => task.id);
+      await supabase.from("tasks").update({ date: todayStr() }).in("id", ids);
+    }
+    setCarryOverTasks([]);
+    setSelectedDate(todayDate);
+    setActiveView("day");
+  }, [carryOverTasks, user]);
+
+  const handleReorder = useCallback(async (date, reorderedTasks) => {
+    const withPositions = reorderedTasks.map((t, i) => ({ ...t, position: i }));
+    setTasks(prev => ({ ...prev, [date]: withPositions }));
+    if (user && !user.guest) {
+      await Promise.all(
+        withPositions.map(t => supabase.from("tasks").update({ position: t.position }).eq("id", t.id))
+      );
+    }
   }, [user]);
 
   const getWeekStart = (dateStr) => {
@@ -633,7 +824,9 @@ export default function App() {
             onAddTask={() => setModal({ date: selectedDate })}
             onToggle={handleToggle}
             onEdit={(date, task) => setModal({ date, task })}
-            onDelete={handleDelete} />
+            onDelete={handleDelete}
+            onMoveTask={(date, task) => setMovePicker({ date, task })}
+            onReorder={handleReorder} />
         )}
         {activeView === "week" && (
           <WeekView startDate={getWeekStart(`${calYear}-${pad(calMonth + 1)}-01`)} tasks={tasks}
@@ -673,6 +866,20 @@ export default function App() {
         <TaskModal date={modal.date} task={modal.task}
           onSave={(task) => persistTask(modal.date, task)}
           onClose={() => setModal(null)} />
+      )}
+
+      {movePicker && (
+        <MoveTaskPicker
+          currentDate={movePicker.date}
+          onMove={(toDate) => moveTask(movePicker.date, toDate, movePicker.task.id)}
+          onClose={() => setMovePicker(null)} />
+      )}
+
+      {carryOverTasks.length > 0 && (
+        <CarryOverDialog
+          count={carryOverTasks.length}
+          onConfirm={handleCarryOver}
+          onDismiss={() => setCarryOverTasks([])} />
       )}
     </div>
   );
