@@ -877,6 +877,7 @@ function WeightView({ user, today, onCreateAccount }) {
   const [todayWeight, setTodayWeight] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showDailyLog, setShowDailyLog] = useState(false);
   const isGuest = user?.guest;
 
   useEffect(() => {
@@ -1184,6 +1185,80 @@ function WeightView({ user, today, onCreateAccount }) {
               {getMessage()}
             </p>
           </div>
+
+          {/* ── Daily log toggle button ── */}
+          <button onClick={() => setShowDailyLog(v => !v)} style={{
+            width: "100%", marginTop: "1rem", padding: ".85rem 1.2rem",
+            background: T.accentLight, border: `1.5px solid ${T.border}`,
+            borderRadius: "16px", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: ".5rem",
+          }}>
+            <span style={{ fontSize: ".88rem", fontWeight: 700, color: T.accentDark }}>
+              {showDailyLog ? "Ocultar registro" : "Ver registro diario"}
+            </span>
+            <span style={{ fontSize: ".75rem", color: T.accentDark }}>
+              {showDailyLog ? "\u25B2" : "\u25BC"}
+            </span>
+          </button>
+
+          {/* ── Daily log list ── */}
+          {showDailyLog && (
+            <div style={{
+              background: T.bgCard, borderRadius: "20px", padding: "1rem 1.2rem",
+              boxShadow: T.shadowCard, marginTop: ".75rem",
+            }}>
+              <h4 style={{ fontSize: ".85rem", fontWeight: 700, color: T.text, marginBottom: ".7rem" }}>
+                Registro diario
+              </h4>
+              <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+                {[...logs].reverse().map((l, i) => {
+                  const origIdx = logs.indexOf(l);
+                  const prev = origIdx > 0 ? logs[origIdx - 1] : null;
+                  const diff = prev ? l.weight_kg - prev.weight_kg : null;
+                  const d = new Date(l.date + "T00:00:00");
+                  const dayName = d.toLocaleDateString("es-ES", { weekday: "short" });
+                  const dayNum = d.getDate();
+                  const monthName = d.toLocaleDateString("es-ES", { month: "short" });
+                  const isToday = l.date === today;
+                  return (
+                    <div key={l.date} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: ".6rem .5rem",
+                      background: isToday ? T.accentLight : "transparent",
+                      borderRadius: isToday ? "12px" : "0",
+                      borderBottom: i < logs.length - 1 && !isToday ? `1px solid ${T.borderGray}` : "none",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: ".6rem" }}>
+                        <div style={{
+                          width: "38px", height: "38px", borderRadius: "10px",
+                          background: isToday ? T.accentGrad : T.bgCardWarm,
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <span style={{ fontSize: ".62rem", fontWeight: 600, color: isToday ? "#fff" : T.textMuted, lineHeight: 1, textTransform: "uppercase" }}>
+                            {dayName}
+                          </span>
+                          <span style={{ fontSize: ".88rem", fontWeight: 700, color: isToday ? "#fff" : T.text, lineHeight: 1.15 }}>
+                            {dayNum}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: ".8rem", color: isToday ? T.accentDark : T.textMuted, fontWeight: isToday ? 600 : 400, textTransform: "capitalize" }}>{monthName}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: ".5rem" }}>
+                        {diff != null && (
+                          <span style={{ fontSize: ".75rem", fontWeight: 600, color: chgColor(diff) }}>
+                            {chgArrow(diff)} {Math.abs(diff).toFixed(1)}
+                          </span>
+                        )}
+                        <span style={{ fontSize: "1.1rem", fontWeight: 700, color: isToday ? T.accentDark : T.text }}>{l.weight_kg.toFixed(1)}</span>
+                        <span style={{ fontSize: ".72rem", color: T.textMuted }}>kg</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
