@@ -401,7 +401,8 @@ function MoveTaskPicker({ currentDate, onMove, onClose }) {
 }
 
 // ─── DayView ──────────────────────────────────────────────────────────────────
-function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTask, onReorder }) {
+function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTask, onReorder,
+                   pendingPastCount, onMovePendingToToday, onDismissPending, showPendingBanner }) {
   const dayTasks = [...(tasks[date] || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const isToday = date === todayStr();
   const weekend = isWeekend(date);
@@ -545,6 +546,34 @@ function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTas
           )}
         </div>
       </div>
+
+      {/* Pending tasks from past days banner */}
+      {showPendingBanner && pendingPastCount > 0 && (
+        <div className="task-card" style={{
+          background: T.accentLight,
+          border: `1.5px solid ${T.border}`,
+          borderRadius: "14px",
+          padding: ".85rem 1rem",
+          marginBottom: "1rem",
+        }}>
+          <p style={{ color: T.textSub, fontSize: ".88rem", margin: "0 0 .6rem", lineHeight: 1.4 }}>
+            Tienes <strong style={{ color: T.accentDark }}>{pendingPastCount}</strong> tarea{pendingPastCount > 1 ? "s" : ""} pendiente{pendingPastCount > 1 ? "s" : ""} de días anteriores
+          </p>
+          <div style={{ display: "flex", gap: ".5rem" }}>
+            <button onClick={onMovePendingToToday} style={{
+              flex: 1, padding: ".55rem .8rem", background: T.accentGrad,
+              border: "none", borderRadius: "10px", color: T.textOnAccent,
+              fontWeight: 600, fontSize: ".82rem", cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(240,180,41,.3)",
+            }}>Mover a hoy</button>
+            <button onClick={onDismissPending} style={{
+              flex: 1, padding: ".55rem .8rem", background: T.bg,
+              border: `1.5px solid ${T.borderGray}`, borderRadius: "10px",
+              color: T.textSub, fontWeight: 600, fontSize: ".82rem", cursor: "pointer",
+            }}>Ignorar</button>
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {dayTasks.length === 0 && (
@@ -1275,6 +1304,7 @@ export default function App() {
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [modal, setModal] = useState(null);
   const [movePicker, setMovePicker] = useState(null);
+  const [dismissedPendingBanner, setDismissedPendingBanner] = useState(false);
   const today = todayStr();
 
   // Inject global CSS once
@@ -1360,6 +1390,49 @@ export default function App() {
       );
     }
   }, [user]);
+
+  // Count pending tasks from past days
+  let pendingPastCount = 0;
+  if (selectedDate === today) {
+    Object.entries(tasks).forEach(([date, dayTasks]) => {
+      if (date < today) {
+        pendingPastCount += dayTasks.filter(t => !t.done).length;
+      }
+    });
+  }
+
+  const moveAllPendingToToday = useCallback(async () => {
+    const todayDate = todayStr();
+    const updates = [];
+    const newTasks = {};
+    let todayTasks = [...(tasks[todayDate] || [])];
+    let position = todayTasks.length;
+
+    Object.entries(tasks).forEach(([date, dayTasks]) => {
+      if (date >= todayDate) {
+        newTasks[date] = dayTasks;
+        return;
+      }
+      const pending = dayTasks.filter(t => !t.done);
+      const remaining = dayTasks.filter(t => t.done);
+      pending.forEach(task => {
+        const movedTask = { ...task, position: position++ };
+        todayTasks.push(movedTask);
+        updates.push({ id: task.id, date: todayDate, position: movedTask.position });
+      });
+      newTasks[date] = remaining;
+    });
+
+    newTasks[todayDate] = todayTasks;
+    setTasks(newTasks);
+    setDismissedPendingBanner(true);
+
+    if (user && !user.guest) {
+      await Promise.all(
+        updates.map(u => supabase.from("tasks").update({ date: u.date, position: u.position }).eq("id", u.id))
+      );
+    }
+  }, [tasks, user]);
 
   const getWeekStart = (dateStr) => {
     const d = new Date(dateStr + "T12:00:00");
@@ -1529,7 +1602,11 @@ export default function App() {
             onEdit={(date, task) => setModal({ date, task })}
             onDelete={handleDelete}
             onMoveTask={(date, task) => setMovePicker({ date, task })}
-            onReorder={handleReorder} />
+            onReorder={handleReorder}
+            pendingPastCount={pendingPastCount}
+            onMovePendingToToday={moveAllPendingToToday}
+            onDismissPending={() => setDismissedPendingBanner(true)}
+            showPendingBanner={selectedDate === today && !dismissedPendingBanner} />
         )}
         {activeView === "week" && (
           <WeekView startDate={getWeekStart(`${calYear}-${pad(calMonth + 1)}-01`)}
