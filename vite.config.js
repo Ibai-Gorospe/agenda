@@ -6,12 +6,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "prompt",
+      registerType: "autoUpdate",
       includeAssets: ["icon-192.png", "icon-512.png"],
       manifest: {
         name: "Agenda",
         short_name: "Agenda",
         description: "Tu tiempo, tu orden",
+        start_url: "/",
         theme_color: "#f5f0e8",
         background_color: "#f5f0e8",
         display: "standalone",
