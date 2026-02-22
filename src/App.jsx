@@ -42,7 +42,6 @@ export default function App() {
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const undoRef = useRef(null);
-  const importInputRef = useRef(null);
   const today = todayStr();
   const { enqueue, flush } = useOfflineQueue();
 
@@ -340,63 +339,6 @@ export default function App() {
     }
   }, [user, withSync]);
 
-  // Export / Import
-  const exportTasks = useCallback(() => {
-    const allTasks = [];
-    Object.entries(tasks).forEach(([date, dayTasks]) => {
-      dayTasks.forEach(t => allTasks.push({
-        date, text: t.text, time: t.time || "", done: t.done,
-        reminder: t.reminder || "0", category: t.category || null,
-        recurrence: t.recurrence || null, priority: t.priority || null,
-        notes: t.notes || null, subtasks: t.subtasks || [],
-      }));
-    });
-    allTasks.sort((a, b) => a.date.localeCompare(b.date));
-    const blob = new Blob([JSON.stringify(allTasks, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `agenda-${todayStr()}.json`; a.click();
-    URL.revokeObjectURL(url);
-    addToast("Tareas exportadas correctamente", "success", null, 2500);
-  }, [tasks, addToast]);
-
-  const importTasks = useCallback(async (file) => {
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (!Array.isArray(data)) { addToast("Formato inválido", "error"); return; }
-      const imported = {};
-      data.forEach(t => {
-        if (!t.date || !t.text) return;
-        if (!imported[t.date]) imported[t.date] = [];
-        imported[t.date].push({
-          id: genId(), text: t.text, time: t.time || null,
-          reminder: t.reminder || "0", done: t.done || false,
-          position: imported[t.date].length,
-          category: t.category || null, recurrence: t.recurrence || null,
-          priority: t.priority || null, notes: t.notes || null,
-          subtasks: t.subtasks || [],
-        });
-      });
-      setTasks(prev => {
-        const merged = { ...prev };
-        Object.entries(imported).forEach(([date, newTasks]) => {
-          const existing = merged[date] || [];
-          merged[date] = [...existing, ...newTasks.map((t, i) => ({ ...t, position: existing.length + i }))];
-        });
-        return merged;
-      });
-      if (user && !user.guest) {
-        await withSync(async () => {
-          for (const [date, newTasks] of Object.entries(imported)) {
-            for (const t of newTasks) await upsertTask(user.id, date, t);
-          }
-        });
-      }
-      addToast(`${data.length} tareas importadas`, "success", null, 3000);
-    } catch { addToast("Error al importar el archivo", "error"); }
-  }, [user, withSync, addToast]);
-
   // Swipe navigation for day view
   const swipeHandlers = useSwipeNav({
     onSwipeLeft: () => activeView === "day" && setSelectedDate(prev => dateAdd(prev, 1)),
@@ -483,16 +425,6 @@ export default function App() {
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".88rem",
           }}>{"\uD83D\uDD0D"}</button>
-          <input ref={importInputRef} type="file" accept=".json" style={{ display: "none" }}
-            onChange={e => { if (e.target.files[0]) importTasks(e.target.files[0]); e.target.value = ""; }} />
-          <button onClick={() => importInputRef.current?.click()} aria-label="Importar tareas" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".82rem",
-          }}>{"\u2B06"}</button>
-          <button onClick={exportTasks} aria-label="Exportar tareas" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".82rem",
-          }}>{"\u2B07"}</button>
           {isGuest && (
             <button onClick={() => { setUser(null); setTasks({}); }} style={{
               background: T.accentLight, border: "none", borderRadius: "8px",

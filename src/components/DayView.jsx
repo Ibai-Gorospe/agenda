@@ -39,63 +39,73 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
           border: `1.5px solid ${isDragging ? T.accent : T.borderGray}`,
           borderLeft: priorityColor ? `3px solid ${priorityColor}` : `1.5px solid ${isDragging ? T.accent : T.borderGray}`,
           borderRadius: "16px", padding: ".85rem 1rem",
-          display: "flex", alignItems: "flex-start", gap: ".7rem",
           boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,.15)" : (task.done ? "none" : T.shadowCard),
           position: "relative",
         }}>
-        {/* Drag handle */}
-        <div {...listeners} style={{
-          width: "28px", minHeight: "36px", flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "grab", touchAction: "none", color: T.textMuted,
-          fontSize: "1rem", userSelect: "none",
-        }}>⋮⋮</div>
+        {/* Top row: drag handle + checkbox + text */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: ".7rem" }}>
+          {/* Drag handle */}
+          <div {...listeners} style={{
+            width: "24px", minHeight: "36px", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "grab", touchAction: "none", color: T.textMuted,
+            fontSize: "1rem", userSelect: "none",
+          }}>⋮⋮</div>
 
-        {/* Checkbox */}
-        <button onClick={() => onToggle(date, task.id)} aria-label={task.done ? "Marcar como pendiente" : "Marcar como completada"} style={{
-          width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
-          border: `2.5px solid ${task.done ? T.accent : T.borderGray}`,
-          background: task.done ? T.accentGrad : "transparent",
-          cursor: "pointer", display: "flex", alignItems: "center",
-          justifyContent: "center", transition: "all .15s",
-        }}>
-          {task.done && <span className="check-pop" style={{ color: "#fff", fontSize: ".85rem", fontWeight: 800 }}>✓</span>}
-        </button>
+          {/* Checkbox */}
+          <button onClick={() => onToggle(date, task.id)} aria-label={task.done ? "Marcar como pendiente" : "Marcar como completada"} style={{
+            width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
+            border: `2.5px solid ${task.done ? T.accent : T.borderGray}`,
+            background: task.done ? T.accentGrad : "transparent",
+            cursor: "pointer", display: "flex", alignItems: "center",
+            justifyContent: "center", transition: "all .15s",
+          }}>
+            {task.done && <span className="check-pop" style={{ color: "#fff", fontSize: ".8rem", fontWeight: 800 }}>✓</span>}
+          </button>
 
-        {/* Text */}
-        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
-          onClick={() => onToggle(date, task.id)}>
-          <div style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
-            {cat && (
-              <span style={{
-                width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                background: task.done ? T.textMuted : cat.color,
-              }} />
-            )}
-            <p style={{
-              color: task.done ? T.textMuted : T.text,
-              textDecoration: task.done ? "line-through" : "none",
-              fontSize: ".97rem", lineHeight: 1.4, wordBreak: "break-word",
-              margin: 0, flex: 1,
-            }}>{task.text}</p>
-          </div>
-          {/* Subtasks progress */}
-          {subtasksTotal > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".3rem" }}>
-              <div style={{
-                flex: 1, height: "4px", background: T.bgPage, borderRadius: "2px", maxWidth: "120px",
-              }}>
-                <div style={{
-                  height: "100%", borderRadius: "2px",
-                  width: `${(subtasksDone / subtasksTotal) * 100}%`,
-                  background: subtasksDone === subtasksTotal ? "#4aba6a" : T.accent,
-                  transition: "width .2s",
+          {/* Text */}
+          <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
+            onClick={() => onToggle(date, task.id)}>
+            <div style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
+              {cat && (
+                <span style={{
+                  width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                  background: task.done ? T.textMuted : cat.color,
                 }} />
-              </div>
-              <span style={{ fontSize: ".72rem", color: T.textMuted }}>{subtasksDone}/{subtasksTotal}</span>
+              )}
+              <p style={{
+                color: task.done ? T.textMuted : T.text,
+                textDecoration: task.done ? "line-through" : "none",
+                fontSize: ".97rem", lineHeight: 1.4, wordBreak: "break-word",
+                margin: 0, flex: 1,
+              }}>{task.text}</p>
             </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".35rem", flexWrap: "wrap" }}>
+            {/* Subtasks progress */}
+            {subtasksTotal > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".3rem" }}>
+                <div style={{
+                  flex: 1, height: "4px", background: T.bgPage, borderRadius: "2px", maxWidth: "120px",
+                }}>
+                  <div style={{
+                    height: "100%", borderRadius: "2px",
+                    width: `${(subtasksDone / subtasksTotal) * 100}%`,
+                    background: subtasksDone === subtasksTotal ? "#4aba6a" : T.accent,
+                    transition: "width .2s",
+                  }} />
+                </div>
+                <span style={{ fontSize: ".72rem", color: T.textMuted }}>{subtasksDone}/{subtasksTotal}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom row: badges + action buttons */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          marginTop: ".5rem", paddingLeft: "56px",
+        }}>
+          {/* Badges */}
+          <div style={{ display: "flex", alignItems: "center", gap: ".4rem", flexWrap: "wrap", flex: 1, minWidth: 0 }}>
             {cat && (
               <Badge color={task.done ? T.textMuted : cat.color} bg={task.done ? T.doneBg : cat.bg}>
                 {cat.label}
@@ -127,30 +137,30 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
               </Badge>
             )}
           </div>
-        </div>
 
-        {/* Action buttons */}
-        <div style={{ display: "flex", gap: ".2rem", flexShrink: 0, alignItems: "flex-start" }}>
-          <button onClick={() => onDuplicate(date, task)} aria-label="Duplicar tarea" style={{
-            width: "36px", height: "36px", background: T.bg, border: "none",
-            borderRadius: "10px", color: T.textMuted, cursor: "pointer",
-            fontSize: ".95rem", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>📋</button>
-          <button onClick={() => onMoveTask(date, task)} aria-label="Mover tarea" style={{
-            width: "36px", height: "36px", background: T.bg, border: "none",
-            borderRadius: "10px", color: T.textMuted, cursor: "pointer",
-            fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>📅</button>
-          <button onClick={() => onEdit(date, task)} aria-label="Editar tarea" style={{
-            width: "36px", height: "36px", background: T.bg, border: "none",
-            borderRadius: "10px", color: T.textMuted, cursor: "pointer",
-            fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>✏️</button>
-          <button onClick={() => onDelete(date, task.id)} aria-label="Eliminar tarea" style={{
-            width: "36px", height: "36px", background: T.bg, border: "none",
-            borderRadius: "10px", color: T.textMuted, cursor: "pointer",
-            fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>🗑</button>
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: ".15rem", flexShrink: 0 }}>
+            <button onClick={() => onDuplicate(date, task)} aria-label="Duplicar tarea" style={{
+              width: "30px", height: "30px", background: T.bg, border: "none",
+              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
+              fontSize: ".85rem", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>📋</button>
+            <button onClick={() => onMoveTask(date, task)} aria-label="Mover tarea" style={{
+              width: "30px", height: "30px", background: T.bg, border: "none",
+              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
+              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>📅</button>
+            <button onClick={() => onEdit(date, task)} aria-label="Editar tarea" style={{
+              width: "30px", height: "30px", background: T.bg, border: "none",
+              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
+              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>✏️</button>
+            <button onClick={() => onDelete(date, task.id)} aria-label="Eliminar tarea" style={{
+              width: "30px", height: "30px", background: T.bg, border: "none",
+              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
+              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>🗑</button>
+          </div>
         </div>
       </div>
     </div>
