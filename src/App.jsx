@@ -132,6 +132,41 @@ const formatWeekRange = (startDateStr) => {
   return `${sD} — ${eD} ${sM} ${sY}`;
 };
 
+// ─── Categories ─────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  { id: "personal", label: "Personal", color: "#6366f1", bg: "#eef2ff" },
+  { id: "trabajo",  label: "Trabajo",  color: "#0891b2", bg: "#ecfeff" },
+  { id: "salud",    label: "Salud",    color: "#16a34a", bg: "#f0fdf4" },
+  { id: "estudio",  label: "Estudio",  color: "#d97706", bg: "#fffbeb" },
+  { id: "hogar",    label: "Hogar",    color: "#e05252", bg: "#fef2f2" },
+];
+const getCat = (id) => CATEGORIES.find(c => c.id === id);
+
+const RECURRENCE_OPTIONS = [
+  { value: "", label: "Sin repetir" },
+  { value: "daily", label: "Cada día" },
+  { value: "weekdays", label: "Lun — Vie" },
+  { value: "weekly", label: "Cada semana" },
+  { value: "monthly", label: "Cada mes" },
+];
+const RECURRENCE_LABELS = { daily: "Diaria", weekdays: "L-V", weekly: "Semanal", monthly: "Mensual" };
+
+const nextRecurrenceDate = (dateStr, recurrence) => {
+  const d = new Date(dateStr + "T12:00:00");
+  switch (recurrence) {
+    case "daily": d.setDate(d.getDate() + 1); break;
+    case "weekdays": {
+      d.setDate(d.getDate() + 1);
+      while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+      break;
+    }
+    case "weekly": d.setDate(d.getDate() + 7); break;
+    case "monthly": d.setMonth(d.getMonth() + 1); break;
+    default: return null;
+  }
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 // ─── UUID fallback ──────────────────────────────────────────────────────────
 const genId = () => {
   try { return crypto.randomUUID(); }
@@ -147,7 +182,7 @@ async function fetchTasks(userId) {
   const map = {};
   for (const t of data) {
     if (!map[t.date]) map[t.date] = [];
-    map[t.date].push({ id: t.id, text: t.text, time: t.time, reminder: t.reminder, done: t.done, position: t.position ?? 0 });
+    map[t.date].push({ id: t.id, text: t.text, time: t.time, reminder: t.reminder, done: t.done, position: t.position ?? 0, category: t.category || null, recurrence: t.recurrence || null });
   }
   return map;
 }
@@ -157,6 +192,8 @@ async function upsertTask(userId, date, task) {
     text: task.text, time: task.time || null,
     reminder: task.reminder || "0", done: task.done,
     position: task.position ?? 0,
+    category: task.category || null,
+    recurrence: task.recurrence || null,
   });
   if (error) throw new Error("Error al guardar tarea");
 }
@@ -458,6 +495,8 @@ function TaskModal({ date, task, onSave, onClose }) {
   const [text, setText] = useState(task?.text || "");
   const [time, setTime] = useState(task?.time || "");
   const [reminder, setReminder] = useState(task?.reminder || "15");
+  const [category, setCategory] = useState(task?.category || null);
+  const [recurrence, setRecurrence] = useState(task?.recurrence || "");
   const weekend = isWeekend(date);
   const inputRef = useRef(null);
 
@@ -470,7 +509,7 @@ function TaskModal({ date, task, onSave, onClose }) {
 
   const save = () => {
     if (!text.trim()) return;
-    onSave({ ...task, text: text.trim(), time, reminder, done: task?.done || false, position: task?.position ?? 0, id: task?.id || genId() });
+    onSave({ ...task, text: text.trim(), time, reminder, category: category || null, recurrence: recurrence || null, done: task?.done || false, position: task?.position ?? 0, id: task?.id || genId() });
     onClose();
   };
 
@@ -525,6 +564,42 @@ function TaskModal({ date, task, onSave, onClose }) {
               <option value="1440">1 día antes</option>
             </select>
           </div>
+        </div>
+
+        {/* Category selector */}
+        <div style={{ marginBottom: "1rem" }}>
+          <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600,
+            color: T.textSub, marginBottom: ".4rem" }}>Categoría</label>
+          <div style={{ display: "flex", gap: ".4rem", flexWrap: "wrap" }}>
+            <button onClick={() => setCategory(null)} style={{
+              padding: ".35rem .7rem", borderRadius: "20px", fontSize: ".78rem", fontWeight: 600,
+              cursor: "pointer", transition: "all .15s",
+              background: !category ? T.bgPage : "transparent",
+              border: `1.5px solid ${!category ? T.accent : T.borderGray}`,
+              color: !category ? T.text : T.textMuted,
+            }}>Ninguna</button>
+            {CATEGORIES.map(c => (
+              <button key={c.id} onClick={() => setCategory(c.id)} style={{
+                padding: ".35rem .7rem", borderRadius: "20px", fontSize: ".78rem", fontWeight: 600,
+                cursor: "pointer", transition: "all .15s",
+                background: category === c.id ? c.bg : "transparent",
+                border: `1.5px solid ${category === c.id ? c.color : T.borderGray}`,
+                color: category === c.id ? c.color : T.textMuted,
+              }}>{c.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Recurrence selector */}
+        <div style={{ marginBottom: "1.2rem" }}>
+          <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600,
+            color: T.textSub, marginBottom: ".35rem" }}>Repetir</label>
+          <select value={recurrence} onChange={e => setRecurrence(e.target.value)}
+            style={{ ...inputStyle, background: T.bg }}>
+            {RECURRENCE_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{ display: "flex", gap: ".75rem" }}>
@@ -826,27 +901,46 @@ function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTas
               {/* Text — tap to toggle */}
               <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
                 onClick={() => onToggle(date, task.id)}>
-                <p style={{
-                  color: task.done ? T.textMuted : T.text,
-                  textDecoration: task.done ? "line-through" : "none",
-                  fontSize: ".97rem", lineHeight: 1.4, wordBreak: "break-word",
-                  margin: 0,
-                }}>{task.text}</p>
-                {task.time && (
-                  <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".35rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
+                  {task.category && (() => { const c = getCat(task.category); return c ? (
+                    <span style={{
+                      width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                      background: task.done ? T.textMuted : c.color,
+                    }} />
+                  ) : null; })()}
+                  <p style={{
+                    color: task.done ? T.textMuted : T.text,
+                    textDecoration: task.done ? "line-through" : "none",
+                    fontSize: ".97rem", lineHeight: 1.4, wordBreak: "break-word",
+                    margin: 0, flex: 1,
+                  }}>{task.text}</p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".35rem", flexWrap: "wrap" }}>
+                  {task.category && (() => { const c = getCat(task.category); return c ? (
+                    <Badge color={task.done ? T.textMuted : c.color} bg={task.done ? T.doneBg : c.bg}>
+                      {c.label}
+                    </Badge>
+                  ) : null; })()}
+                  {task.recurrence && (
+                    <Badge color={task.done ? T.textMuted : (weekend ? T.weekend : T.accentDark)}
+                      bg={task.done ? T.doneBg : (weekend ? T.weekendLight : T.accentLight)}>
+                      {"🔄 "}{RECURRENCE_LABELS[task.recurrence] || task.recurrence}
+                    </Badge>
+                  )}
+                  {task.time && (<>
                     <span style={{ fontSize: ".75rem" }}>🕐</span>
                     <span style={{
                       color: task.done ? T.textMuted : (weekend ? T.weekend : T.accent),
                       fontSize: ".8rem", fontWeight: 600,
                     }}>{task.time}</span>
-                    {task.reminder && task.reminder !== "0" && (
-                      <Badge color={weekend ? T.weekend : T.accentDark}
-                        bg={weekend ? T.weekendLight : T.accentLight}>
-                        {task.reminder >= 60 ? `${task.reminder / 60}h antes` : `${task.reminder}min antes`}
-                      </Badge>
-                    )}
-                  </div>
-                )}
+                  </>)}
+                  {task.time && task.reminder && task.reminder !== "0" && (
+                    <Badge color={weekend ? T.weekend : T.accentDark}
+                      bg={weekend ? T.weekendLight : T.accentLight}>
+                      {task.reminder >= 60 ? `${task.reminder / 60}h antes` : `${task.reminder}min antes`}
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               {/* Action buttons — 36x36 each */}
@@ -1612,19 +1706,42 @@ export default function App() {
   }, [user, tasks, withSync]);
 
   const handleToggle = useCallback(async (date, id) => {
+    const task = tasks[date]?.find(t => t.id === id);
+    if (!task) return;
+    const nowDone = !task.done;
+    const updated = { ...task, done: nowDone };
+
+    // If completing a recurring task, create next occurrence
+    let nextDate = null;
+    let nextTask = null;
+    if (nowDone && task.recurrence) {
+      nextDate = nextRecurrenceDate(date, task.recurrence);
+      if (nextDate) {
+        nextTask = { ...task, id: genId(), done: false, position: (tasks[nextDate] || []).length };
+      }
+    }
+
     setTasks(prev => {
-      const task = (prev[date] || []).find(t => t.id === id);
-      if (!task) return prev;
-      const updated = { ...task, done: !task.done };
-      return { ...prev, [date]: (prev[date] || []).map(t => t.id === id ? updated : t) };
+      const newState = { ...prev, [date]: (prev[date] || []).map(t => t.id === id ? updated : t) };
+      if (nextDate && nextTask) {
+        newState[nextDate] = [...(newState[nextDate] || []), nextTask];
+      }
+      return newState;
     });
+
     if (user && !user.guest) {
       await withSync(async () => {
-        const task = tasks[date]?.find(t => t.id === id);
-        if (task) await upsertTask(user.id, date, { ...task, done: !task.done });
+        await upsertTask(user.id, date, updated);
+        if (nextDate && nextTask) {
+          await upsertTask(user.id, nextDate, nextTask);
+        }
       });
     }
-  }, [user, tasks, withSync]);
+
+    if (nowDone && nextDate && nextTask) {
+      addToast(`Siguiente repetición creada para ${formatDateLabel(nextDate).split(",")[0]}`, "success", null, 3000);
+    }
+  }, [user, tasks, withSync, addToast]);
 
   const handleDelete = useCallback(async (date, id) => {
     const task = tasks[date]?.find(t => t.id === id);
