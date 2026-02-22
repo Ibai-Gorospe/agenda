@@ -93,7 +93,25 @@ const isWeekend = (dateStr) => {
   return d === 0 || d === 6;
 };
 const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const MONTHS_SHORT = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const DAYS_ES = ["L","M","X","J","V","S","D"];
+
+const getWeekStart = (dateStr) => {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const formatWeekRange = (startDateStr) => {
+  const s = new Date(startDateStr + "T12:00:00");
+  const e = new Date(s); e.setDate(e.getDate() + 6);
+  const sD = s.getDate(), eD = e.getDate();
+  const sM = MONTHS_SHORT[s.getMonth()], eM = MONTHS_SHORT[e.getMonth()];
+  const sY = s.getFullYear(), eY = e.getFullYear();
+  if (sY !== eY) return `${sD} ${sM} ${sY} — ${eD} ${eM} ${eY}`;
+  if (s.getMonth() !== e.getMonth()) return `${sD} ${sM} — ${eD} ${eM} ${sY}`;
+  return `${sD} — ${eD} ${sM} ${sY}`;
+};
 
 // ─── Supabase helpers ─────────────────────────────────────────────────────────
 async function fetchTasks(userId) {
@@ -1298,14 +1316,18 @@ function WeightView({ user, today, onCreateAccount }) {
 export default function App() {
   const [user, setUser] = useState(undefined);
   const [tasks, setTasks] = useState({});
-  const [activeView, setActiveView] = useState("day");
+  const [activeView, setActiveView] = useState(() => localStorage.getItem("agenda-activeView") || "day");
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(todayStr()));
   const [modal, setModal] = useState(null);
   const [movePicker, setMovePicker] = useState(null);
   const [dismissedPendingBanner, setDismissedPendingBanner] = useState(false);
   const today = todayStr();
+
+  // Persist active view
+  useEffect(() => { localStorage.setItem("agenda-activeView", activeView); }, [activeView]);
 
   // Inject global CSS once
   useEffect(() => {
@@ -1434,12 +1456,6 @@ export default function App() {
     }
   }, [tasks, user]);
 
-  const getWeekStart = (dateStr) => {
-    const d = new Date(dateStr + "T12:00:00");
-    d.setDate(d.getDate() - (d.getDay() + 6) % 7);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  };
-
   // Loading
   if (user === undefined) return (
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center",
@@ -1531,8 +1547,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Calendar nav bar */}
-      {activeView !== "day" && activeView !== "weight" && (
+      {/* Calendar nav bar — month / year */}
+      {(activeView === "month" || activeView === "year") && (
         <div style={{
           padding: ".65rem 1.25rem",
           background: T.bgCard, borderBottom: `1px solid ${T.borderGray}`,
@@ -1548,6 +1564,43 @@ export default function App() {
             {activeView === "year" ? calYear : `${MONTHS_ES[calMonth]} ${calYear}`}
           </span>
           <button onClick={nextMonth} style={{
+            background: T.bg, border: "none", borderRadius: "8px",
+            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            width: "34px", height: "34px", display: "flex",
+            alignItems: "center", justifyContent: "center",
+          }}>›</button>
+        </div>
+      )}
+
+      {/* Week nav bar */}
+      {activeView === "week" && (
+        <div style={{
+          padding: ".5rem 1rem",
+          background: T.bgCard, borderBottom: `1px solid ${T.borderGray}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <button onClick={() => {
+            const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() - 7);
+            setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+          }} style={{
+            background: T.bg, border: "none", borderRadius: "8px",
+            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            width: "34px", height: "34px", display: "flex",
+            alignItems: "center", justifyContent: "center",
+          }}>‹</button>
+
+          <button onClick={() => setWeekStart(getWeekStart(todayStr()))} style={{
+            background: weekStart === getWeekStart(todayStr()) ? T.accentLight : T.bg,
+            border: "none", borderRadius: "8px",
+            color: weekStart === getWeekStart(todayStr()) ? T.accentDark : T.textSub,
+            fontSize: ".82rem", fontWeight: 700, padding: ".35rem .8rem",
+            cursor: "pointer",
+          }}>{formatWeekRange(weekStart)}</button>
+
+          <button onClick={() => {
+            const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() + 7);
+            setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+          }} style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.text, fontSize: "1.1rem", cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
@@ -1609,7 +1662,7 @@ export default function App() {
             showPendingBanner={selectedDate === today && !dismissedPendingBanner} />
         )}
         {activeView === "week" && (
-          <WeekView startDate={getWeekStart(`${calYear}-${pad(calMonth + 1)}-01`)}
+          <WeekView startDate={weekStart}
             tasks={tasks}
             onSelectDay={d => { setSelectedDate(d); setActiveView("day"); }}
             today={today} />
