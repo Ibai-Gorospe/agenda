@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "./supabase";
 
 // ─── Theme: warm cream + golden yellow, light mode ───────────────────────────
@@ -68,12 +68,31 @@ const GLOBAL_CSS = `
     50% { transform: scale(1.25); }
     100% { transform: scale(1); }
   }
+  @keyframes toastIn {
+    from { transform: translateY(-12px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes toastOut {
+    from { opacity: 1; }
+    to { opacity: 0; transform: translateY(-8px); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .4; }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
   .task-card { animation: slideUp .2s ease; }
   .modal-overlay { animation: fadeIn .15s ease; }
   .modal-sheet { animation: slideUp .25s cubic-bezier(.32,1,.23,1); }
   .check-pop { animation: checkPop .25s ease; }
+  .toast-enter { animation: toastIn .25s ease; }
+  .toast-exit { animation: toastOut .2s ease forwards; }
 
   button:active { opacity: .85; transform: scale(.98); transition: transform .1s; }
+  button:focus-visible { outline: 2px solid #f0b429; outline-offset: 2px; }
+  input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #f0b429; outline-offset: 1px; }
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -113,10 +132,18 @@ const formatWeekRange = (startDateStr) => {
   return `${sD} — ${eD} ${sM} ${sY}`;
 };
 
+// ─── UUID fallback ──────────────────────────────────────────────────────────
+const genId = () => {
+  try { return crypto.randomUUID(); }
+  catch { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+  }); }
+};
+
 // ─── Supabase helpers ─────────────────────────────────────────────────────────
 async function fetchTasks(userId) {
   const { data, error } = await supabase.from("tasks").select("*").eq("user_id", userId);
-  if (error) return {};
+  if (error) throw new Error("Error al cargar tareas");
   const map = {};
   for (const t of data) {
     if (!map[t.date]) map[t.date] = [];
@@ -125,15 +152,17 @@ async function fetchTasks(userId) {
   return map;
 }
 async function upsertTask(userId, date, task) {
-  await supabase.from("tasks").upsert({
+  const { error } = await supabase.from("tasks").upsert({
     id: task.id, user_id: userId, date,
     text: task.text, time: task.time || null,
     reminder: task.reminder || "0", done: task.done,
     position: task.position ?? 0,
   });
+  if (error) throw new Error("Error al guardar tarea");
 }
-async function deleteTask(taskId) {
-  await supabase.from("tasks").delete().eq("id", taskId);
+async function deleteTaskDB(taskId) {
+  const { error } = await supabase.from("tasks").delete().eq("id", taskId);
+  if (error) throw new Error("Error al eliminar tarea");
 }
 
 // ─── Weight log helpers ─────────────────────────────────────────────────────
@@ -142,14 +171,15 @@ async function fetchWeightLogs(userId) {
     .from("weight_logs").select("*")
     .eq("user_id", userId)
     .order("date", { ascending: true });
-  if (error) return [];
+  if (error) throw new Error("Error al cargar registros de peso");
   return data.map(l => ({ id: l.id, date: l.date, weight_kg: Number(l.weight_kg) }));
 }
 async function upsertWeightLog(userId, date, weightKg) {
-  await supabase.from("weight_logs").upsert(
+  const { error } = await supabase.from("weight_logs").upsert(
     { user_id: userId, date, weight_kg: weightKg },
     { onConflict: "user_id,date" }
   );
+  if (error) throw new Error("Error al guardar peso");
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -181,6 +211,136 @@ function Pill({ children, active, onClick, weekend }) {
       color: active ? T.textOnAccent : (weekend ? T.weekend : T.textSub),
       fontWeight: active ? 600 : 400, fontSize: ".85rem", transition: "all .15s",
     }}>{children}</button>
+  );
+}
+
+// ─── Toast container ─────────────────────────────────────────────────────────
+function ToastContainer({ toasts, onDismiss }) {
+  return (
+    <div style={{
+      position: "fixed", top: "env(safe-area-inset-top, 12px)", left: 0, right: 0,
+      zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center",
+      gap: ".5rem", padding: ".75rem 1rem", pointerEvents: "none",
+    }}>
+      {toasts.map(t => (
+        <div key={t.id} className={t.exiting ? "toast-exit" : "toast-enter"} style={{
+          background: t.type === "error" ? "#fef2f2" : t.type === "success" ? "#f0fdf4" : T.accentLight,
+          border: `1.5px solid ${t.type === "error" ? "rgba(224,82,82,.25)" : t.type === "success" ? "rgba(74,186,106,.25)" : T.border}`,
+          borderRadius: "14px", padding: ".7rem 1rem", maxWidth: "400px", width: "100%",
+          boxShadow: "0 4px 20px rgba(0,0,0,.12)", pointerEvents: "auto",
+          display: "flex", alignItems: "center", gap: ".6rem",
+        }}>
+          <span style={{ fontSize: ".9rem", flexShrink: 0 }}>
+            {t.type === "error" ? "!" : t.type === "success" ? "\u2713" : "\u24D8"}
+          </span>
+          <span style={{
+            flex: 1, fontSize: ".84rem", lineHeight: 1.3,
+            color: t.type === "error" ? "#991b1b" : t.type === "success" ? "#166534" : T.textSub,
+          }}>{t.message}</span>
+          {t.action && (
+            <button onClick={t.action.fn} style={{
+              background: t.type === "error" ? "rgba(224,82,82,.12)" : T.accentLight,
+              border: "none", borderRadius: "8px", padding: ".35rem .65rem",
+              color: t.type === "error" ? T.danger : T.accentDark,
+              fontWeight: 700, fontSize: ".78rem", cursor: "pointer", flexShrink: 0,
+            }}>{t.action.label}</button>
+          )}
+          <button onClick={() => onDismiss(t.id)} aria-label="Cerrar" style={{
+            background: "none", border: "none", color: T.textMuted,
+            cursor: "pointer", fontSize: ".9rem", padding: "2px", flexShrink: 0,
+          }}>\u2715</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Search modal ────────────────────────────────────────────────────────────
+function SearchModal({ tasks, onSelectTask, onClose }) {
+  const [query, setQuery] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase().trim();
+    const matches = [];
+    Object.entries(tasks).forEach(([date, dayTasks]) => {
+      dayTasks.forEach(task => {
+        if (task.text.toLowerCase().includes(q)) {
+          matches.push({ date, task });
+        }
+      });
+    });
+    matches.sort((a, b) => b.date.localeCompare(a.date));
+    return matches.slice(0, 20);
+  }, [query, tasks]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
+      zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center",
+      paddingTop: "15vh",
+    }}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{
+        background: T.bgModal, borderRadius: "20px",
+        padding: "1.25rem", width: "100%", maxWidth: "440px",
+        boxShadow: T.shadowFloat, maxHeight: "60vh", display: "flex", flexDirection: "column",
+        margin: "0 1rem",
+      }}>
+        <div style={{ position: "relative", marginBottom: ".75rem" }}>
+          <input ref={inputRef} type="text" value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Buscar tareas..."
+            style={{
+              width: "100%", padding: ".8rem 1rem .8rem 2.4rem",
+              background: T.bg, border: `1.5px solid ${T.borderGray}`,
+              borderRadius: "12px", color: T.text, fontSize: "1rem", outline: "none",
+            }} />
+          <span style={{
+            position: "absolute", left: ".85rem", top: "50%", transform: "translateY(-50%)",
+            color: T.textMuted, fontSize: ".9rem", pointerEvents: "none",
+          }}>{"\uD83D\uDD0D"}</span>
+        </div>
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {query.trim() && results.length === 0 && (
+            <p style={{ color: T.textMuted, fontSize: ".88rem", textAlign: "center", padding: "1.5rem 0" }}>
+              Sin resultados para "{query}"
+            </p>
+          )}
+          {results.map(({ date, task }) => (
+            <button key={task.id} onClick={() => { onSelectTask(date); onClose(); }}
+              style={{
+                width: "100%", textAlign: "left", padding: ".7rem .85rem",
+                background: "transparent", border: "none", borderBottom: `1px solid ${T.borderGray}`,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: ".6rem",
+              }}>
+              <span style={{
+                width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                background: task.done ? T.textMuted : T.accent,
+              }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{
+                  margin: 0, fontSize: ".88rem", color: task.done ? T.textMuted : T.text,
+                  textDecoration: task.done ? "line-through" : "none",
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                }}>{task.text}</p>
+                <p style={{ margin: 0, fontSize: ".72rem", color: T.textMuted }}>
+                  {formatDateLabel(date).split(",").slice(0, 2).join(",")}
+                  {task.time ? ` · ${task.time}` : ""}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -299,10 +459,18 @@ function TaskModal({ date, task, onSave, onClose }) {
   const [time, setTime] = useState(task?.time || "");
   const [reminder, setReminder] = useState(task?.reminder || "15");
   const weekend = isWeekend(date);
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   const save = () => {
     if (!text.trim()) return;
-    onSave({ ...task, text: text.trim(), time, reminder, done: task?.done || false, position: task?.position ?? 0, id: task?.id || crypto.randomUUID() });
+    onSave({ ...task, text: text.trim(), time, reminder, done: task?.done || false, position: task?.position ?? 0, id: task?.id || genId() });
     onClose();
   };
 
@@ -331,8 +499,10 @@ function TaskModal({ date, task, onSave, onClose }) {
           {task?.id ? "Editar tarea" : "Nueva tarea"} · {formatDateLabel(date).split(",")[0]}
         </h3>
 
-        <textarea value={text} onChange={e => setText(e.target.value)}
+        <textarea ref={inputRef} value={text} onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } }}
           placeholder="¿Qué tienes que hacer?" rows={3}
+          aria-label="Descripción de la tarea"
           style={{ ...inputStyle, resize: "none", marginBottom: "1rem", fontFamily: "inherit" }} />
 
         <div style={{ display: "flex", gap: ".75rem", marginBottom: "1.2rem" }}>
@@ -380,6 +550,11 @@ function TaskModal({ date, task, onSave, onClose }) {
 // ─── MoveTaskPicker ──────────────────────────────────────────────────────────
 function MoveTaskPicker({ currentDate, onMove, onClose }) {
   const [targetDate, setTargetDate] = useState(currentDate);
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
   return (
     <div className="modal-overlay" onClick={onClose} style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
@@ -638,7 +813,7 @@ function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTas
                 }}>⋮⋮</div>
 
               {/* Checkbox — 36x36 touch target */}
-              <button onClick={() => onToggle(date, task.id)} style={{
+              <button onClick={() => onToggle(date, task.id)} aria-label={task.done ? "Marcar como pendiente" : "Marcar como completada"} style={{
                 width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
                 border: `2.5px solid ${task.done ? T.accent : T.borderGray}`,
                 background: task.done ? T.accentGrad : "transparent",
@@ -676,17 +851,17 @@ function DayView({ date, tasks, onAddTask, onToggle, onEdit, onDelete, onMoveTas
 
               {/* Action buttons — 36x36 each */}
               <div style={{ display: "flex", gap: ".2rem", flexShrink: 0, alignItems: "flex-start" }}>
-                <button onClick={() => onMoveTask(date, task)} style={{
+                <button onClick={() => onMoveTask(date, task)} aria-label="Mover tarea" style={{
                   width: "36px", height: "36px", background: T.bg, border: "none",
                   borderRadius: "10px", color: T.textMuted, cursor: "pointer",
                   fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>📅</button>
-                <button onClick={() => onEdit(date, task)} style={{
+                <button onClick={() => onEdit(date, task)} aria-label="Editar tarea" style={{
                   width: "36px", height: "36px", background: T.bg, border: "none",
                   borderRadius: "10px", color: T.textMuted, cursor: "pointer",
                   fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>✏️</button>
-                <button onClick={() => onDelete(date, task.id)} style={{
+                <button onClick={() => onDelete(date, task.id)} aria-label="Eliminar tarea" style={{
                   width: "36px", height: "36px", background: T.bg, border: "none",
                   borderRadius: "10px", color: T.textMuted, cursor: "pointer",
                   fontSize: "1.05rem", display: "flex", alignItems: "center", justifyContent: "center",
@@ -1324,7 +1499,29 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [movePicker, setMovePicker] = useState(null);
   const [dismissedPendingBanner, setDismissedPendingBanner] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [syncing, setSyncing] = useState(false);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const undoRef = useRef(null);
   const today = todayStr();
+
+  // ── Toast system ──
+  const addToast = useCallback((message, type = "info", action = null, duration = 4000) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev.slice(-4), { id, message, type, action, exiting: false }]);
+    if (duration > 0) {
+      setTimeout(() => {
+        setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 250);
+      }, duration);
+    }
+  }, []);
+  const dismissToast = useCallback((id) => {
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 250);
+  }, []);
 
   // Persist active view
   useEffect(() => { localStorage.setItem("agenda-activeView", activeView); }, [activeView]);
@@ -1350,119 +1547,214 @@ export default function App() {
   useEffect(() => {
     if (user === undefined) return;
     if (!user || user.guest) { setTasks({}); return; }
-    fetchTasks(user.id).then(setTasks);
-  }, [user]);
+    setTasksLoading(true);
+    fetchTasks(user.id)
+      .then(setTasks)
+      .catch(() => addToast("No se pudieron cargar las tareas. Revisa tu conexión.", "error"))
+      .finally(() => setTasksLoading(false));
+  }, [user, addToast]);
 
   // Notifications
   useEffect(() => {
     if (supportsNotif && Notification.permission === "default") Notification.requestPermission();
   }, []);
 
+  // Online/offline detection
+  useEffect(() => {
+    const goOnline = () => { setIsOnline(true); addToast("Conexión restaurada", "success", null, 2500); };
+    const goOffline = () => { setIsOnline(false); };
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+  }, [addToast]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setSearchOpen(true); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "n" && !modal) { e.preventDefault(); setModal({ date: selectedDate }); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [modal, selectedDate]);
+
+  // ── Sync wrapper ──
+  const withSync = useCallback(async (fn) => {
+    setSyncing(true);
+    try { await fn(); }
+    catch (err) { addToast(err.message || "Error de sincronización", "error"); }
+    finally { setSyncing(false); }
+  }, [addToast]);
+
   const persistTask = useCallback(async (date, task) => {
-    const dayTasks = tasks[date] || [];
-    const idx = dayTasks.findIndex(t => t.id === task.id);
-    let savedTask;
-    let newDay;
-    if (idx >= 0) {
-      savedTask = { ...task, position: dayTasks[idx].position };
-      newDay = dayTasks.map(t => t.id === task.id ? savedTask : t);
-    } else {
-      savedTask = { ...task, position: dayTasks.length };
-      newDay = [...dayTasks, savedTask];
+    setTasks(prev => {
+      const dayTasks = prev[date] || [];
+      const idx = dayTasks.findIndex(t => t.id === task.id);
+      const savedTask = idx >= 0
+        ? { ...task, position: dayTasks[idx].position }
+        : { ...task, position: dayTasks.length };
+      const newDay = idx >= 0
+        ? dayTasks.map(t => t.id === task.id ? savedTask : t)
+        : [...dayTasks, savedTask];
+      return { ...prev, [date]: newDay };
+    });
+    if (user && !user.guest) {
+      await withSync(async () => {
+        const dayTasks = tasks[date] || [];
+        const idx = dayTasks.findIndex(t => t.id === task.id);
+        const savedTask = idx >= 0
+          ? { ...task, position: dayTasks[idx].position }
+          : { ...task, position: dayTasks.length };
+        await upsertTask(user.id, date, savedTask);
+        scheduleNotification(savedTask, date);
+      });
     }
-    setTasks(prev => ({ ...prev, [date]: newDay }));
-    if (user && !user.guest) await upsertTask(user.id, date, savedTask);
-    scheduleNotification(savedTask, date);
-  }, [tasks, user]);
+  }, [user, tasks, withSync]);
 
   const handleToggle = useCallback(async (date, id) => {
-    const task = (tasks[date] || []).find(t => t.id === id);
-    if (!task) return;
-    const updated = { ...task, done: !task.done };
-    setTasks(prev => ({ ...prev, [date]: (prev[date] || []).map(t => t.id === id ? updated : t) }));
-    if (user && !user.guest) await upsertTask(user.id, date, updated);
-  }, [tasks, user]);
+    setTasks(prev => {
+      const task = (prev[date] || []).find(t => t.id === id);
+      if (!task) return prev;
+      const updated = { ...task, done: !task.done };
+      return { ...prev, [date]: (prev[date] || []).map(t => t.id === id ? updated : t) };
+    });
+    if (user && !user.guest) {
+      await withSync(async () => {
+        const task = tasks[date]?.find(t => t.id === id);
+        if (task) await upsertTask(user.id, date, { ...task, done: !task.done });
+      });
+    }
+  }, [user, tasks, withSync]);
 
   const handleDelete = useCallback(async (date, id) => {
+    const task = tasks[date]?.find(t => t.id === id);
+    if (!task) return;
+    // Optimistic delete
     setTasks(prev => ({ ...prev, [date]: (prev[date] || []).filter(t => t.id !== id) }));
-    if (user && !user.guest) await deleteTask(id);
-  }, [user]);
+    // Undo timer
+    if (undoRef.current) clearTimeout(undoRef.current.timer);
+    const undoData = { date, task, timer: null };
+    undoRef.current = undoData;
+    addToast("Tarea eliminada", "info", {
+      label: "Deshacer",
+      fn: () => {
+        if (undoRef.current === undoData) {
+          clearTimeout(undoData.timer);
+          undoRef.current = null;
+          setTasks(prev => {
+            const restored = [...(prev[date] || []), task].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+            return { ...prev, [date]: restored };
+          });
+          addToast("Tarea restaurada", "success", null, 2000);
+        }
+      }
+    }, 5000);
+    undoData.timer = setTimeout(async () => {
+      if (undoRef.current === undoData) {
+        undoRef.current = null;
+        if (user && !user.guest) {
+          try { await deleteTaskDB(id); }
+          catch { addToast("Error al eliminar en el servidor", "error"); }
+        }
+      }
+    }, 5000);
+  }, [tasks, user, addToast]);
 
   const moveTask = useCallback(async (fromDate, toDate, taskId) => {
     if (fromDate === toDate) return;
-    const task = (tasks[fromDate] || []).find(t => t.id === taskId);
-    if (!task) return;
-    const toLen = (tasks[toDate] || []).length;
     setTasks(prev => {
+      const task = (prev[fromDate] || []).find(t => t.id === taskId);
+      if (!task) return prev;
+      const toLen = (prev[toDate] || []).length;
       const fromTasks = (prev[fromDate] || []).filter(t => t.id !== taskId);
       const toTasks = [...(prev[toDate] || []), { ...task, position: toLen }];
       return { ...prev, [fromDate]: fromTasks, [toDate]: toTasks };
     });
     if (user && !user.guest) {
-      await supabase.from("tasks").update({ date: toDate, position: toLen }).eq("id", taskId);
+      await withSync(async () => {
+        const toLen = (tasks[toDate] || []).length;
+        await supabase.from("tasks").update({ date: toDate, position: toLen }).eq("id", taskId);
+      });
     }
-  }, [tasks, user]);
+  }, [user, tasks, withSync]);
 
   const handleReorder = useCallback(async (date, reorderedTasks) => {
     const withPositions = reorderedTasks.map((t, i) => ({ ...t, position: i }));
     setTasks(prev => ({ ...prev, [date]: withPositions }));
     if (user && !user.guest) {
-      await Promise.all(
-        withPositions.map(t => supabase.from("tasks").update({ position: t.position }).eq("id", t.id))
-      );
+      await withSync(async () => {
+        await Promise.all(
+          withPositions.map(t => supabase.from("tasks").update({ position: t.position }).eq("id", t.id))
+        );
+      });
     }
-  }, [user]);
+  }, [user, withSync]);
 
   // Count pending tasks from past days
-  let pendingPastCount = 0;
-  if (selectedDate === today) {
+  const pendingPastCount = useMemo(() => {
+    if (selectedDate !== today) return 0;
+    let count = 0;
     Object.entries(tasks).forEach(([date, dayTasks]) => {
-      if (date < today) {
-        pendingPastCount += dayTasks.filter(t => !t.done).length;
-      }
+      if (date < today) count += dayTasks.filter(t => !t.done).length;
     });
-  }
+    return count;
+  }, [tasks, selectedDate, today]);
 
   const moveAllPendingToToday = useCallback(async () => {
     const todayDate = todayStr();
     const updates = [];
-    const newTasks = {};
-    let todayTasks = [...(tasks[todayDate] || [])];
-    let position = todayTasks.length;
-
-    Object.entries(tasks).forEach(([date, dayTasks]) => {
-      if (date >= todayDate) {
-        newTasks[date] = dayTasks;
-        return;
-      }
-      const pending = dayTasks.filter(t => !t.done);
-      const remaining = dayTasks.filter(t => t.done);
-      pending.forEach(task => {
-        const movedTask = { ...task, position: position++ };
-        todayTasks.push(movedTask);
-        updates.push({ id: task.id, date: todayDate, position: movedTask.position });
+    setTasks(prev => {
+      const newTasks = {};
+      let todayTasks = [...(prev[todayDate] || [])];
+      let position = todayTasks.length;
+      Object.entries(prev).forEach(([date, dayTasks]) => {
+        if (date >= todayDate) { newTasks[date] = dayTasks; return; }
+        const pending = dayTasks.filter(t => !t.done);
+        const remaining = dayTasks.filter(t => t.done);
+        pending.forEach(task => {
+          const movedTask = { ...task, position: position++ };
+          todayTasks.push(movedTask);
+          updates.push({ id: task.id, date: todayDate, position: movedTask.position });
+        });
+        newTasks[date] = remaining;
       });
-      newTasks[date] = remaining;
+      newTasks[todayDate] = todayTasks;
+      return newTasks;
     });
-
-    newTasks[todayDate] = todayTasks;
-    setTasks(newTasks);
     setDismissedPendingBanner(true);
-
     if (user && !user.guest) {
-      await Promise.all(
-        updates.map(u => supabase.from("tasks").update({ date: u.date, position: u.position }).eq("id", u.id))
-      );
+      await withSync(async () => {
+        await Promise.all(
+          updates.map(u => supabase.from("tasks").update({ date: u.date, position: u.position }).eq("id", u.id))
+        );
+      });
     }
-  }, [tasks, user]);
+  }, [user, withSync]);
 
-  // Loading
+  // ── Export tasks ──
+  const exportTasks = useCallback(() => {
+    const allTasks = [];
+    Object.entries(tasks).forEach(([date, dayTasks]) => {
+      dayTasks.forEach(t => allTasks.push({ date, text: t.text, time: t.time || "", done: t.done, reminder: t.reminder || "0" }));
+    });
+    allTasks.sort((a, b) => a.date.localeCompare(b.date));
+    const blob = new Blob([JSON.stringify(allTasks, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `agenda-${todayStr()}.json`; a.click();
+    URL.revokeObjectURL(url);
+    addToast("Tareas exportadas correctamente", "success", null, 2500);
+  }, [tasks, addToast]);
+
+  // Loading screen
   if (user === undefined) return (
-    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center",
-      justifyContent: "center", background: T.bgPage }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", background: T.bgPage, gap: "1rem" }}>
       <img src="/icon-192.png" alt="Agenda" style={{
         width: "48px", height: "48px", borderRadius: "14px",
         boxShadow: "0 4px 16px rgba(240,180,41,.4)" }} />
+      <div style={{ width: "24px", height: "24px", border: `3px solid ${T.borderGray}`,
+        borderTopColor: T.accent, borderRadius: "50%", animation: "spin .6s linear infinite" }} />
     </div>
   );
 
@@ -1473,14 +1765,12 @@ export default function App() {
   const nextMonth = () => calMonth === 11 ? (setCalMonth(0), setCalYear(y => y + 1)) : setCalMonth(m => m + 1);
 
   const navItems = [
-    { key: "day", icon: "📅", label: "Hoy" },
-    { key: "week", icon: "📆", label: "Semana" },
-    { key: "month", icon: "🗓", label: "Mes" },
-    { key: "year", icon: "📊", label: "Año" },
-    { key: "weight", icon: "⚖️", label: "Peso" },
+    { key: "day", icon: "\uD83D\uDCC5", label: "Hoy" },
+    { key: "week", icon: "\uD83D\uDCC6", label: "Semana" },
+    { key: "month", icon: "\uD83D\uDDD3", label: "Mes" },
+    { key: "year", icon: "\uD83D\uDCCA", label: "A\u00F1o" },
+    { key: "weight", icon: "\u2696\uFE0F", label: "Peso" },
   ];
-
-  const todayIsWeekend = isWeekend(selectedDate);
 
   return (
     <div style={{
@@ -1504,13 +1794,27 @@ export default function App() {
             boxShadow: "0 2px 8px rgba(240,180,41,.3)",
           }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: ".95rem", color: T.text }}>Agenda</div>
+            <div style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
+              <span style={{ fontWeight: 700, fontSize: ".95rem", color: T.text }}>Agenda</span>
+              {syncing && (
+                <div style={{ width: "12px", height: "12px", border: `2px solid ${T.borderGray}`,
+                  borderTopColor: T.accent, borderRadius: "50%", animation: "spin .6s linear infinite" }} />
+              )}
+            </div>
             <div style={{ fontSize: ".72rem", color: T.textMuted }}>
               {isGuest ? "Modo invitado" : user.email}
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: ".5rem" }}>
+        <div style={{ display: "flex", gap: ".4rem" }}>
+          <button onClick={() => setSearchOpen(true)} aria-label="Buscar tareas" style={{
+            background: T.bg, border: "none", borderRadius: "8px",
+            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".88rem",
+          }}>{"\uD83D\uDD0D"}</button>
+          <button onClick={exportTasks} aria-label="Exportar tareas" style={{
+            background: T.bg, border: "none", borderRadius: "8px",
+            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".82rem",
+          }}>{"\u2B07"}</button>
           {isGuest && (
             <button onClick={() => { setUser(null); setTasks({}); }} style={{
               background: T.accentLight, border: "none", borderRadius: "8px",
@@ -1521,7 +1825,7 @@ export default function App() {
           <button onClick={async () => {
             if (!isGuest) await supabase.auth.signOut();
             setUser(null); setTasks({});
-          }} style={{
+          }} aria-label="Cerrar sesión" style={{
             background: T.bg, border: `1px solid ${T.borderGray}`,
             borderRadius: "8px", color: T.textSub,
             padding: ".35rem .7rem", cursor: "pointer", fontSize: ".78rem",
@@ -1529,13 +1833,26 @@ export default function App() {
         </div>
       </header>
 
+      {/* Offline banner */}
+      {!isOnline && (
+        <div style={{
+          background: "#fef2f2", borderBottom: `1px solid rgba(224,82,82,.2)`,
+          padding: ".55rem 1.25rem", display: "flex", alignItems: "center", gap: ".5rem",
+        }}>
+          <span style={{ fontSize: ".82rem" }}>!</span>
+          <p style={{ color: "#991b1b", fontSize: ".78rem", margin: 0 }}>
+            Sin conexión — los cambios se guardarán cuando vuelvas a tener red.
+          </p>
+        </div>
+      )}
+
       {/* Guest banner */}
       {isGuest && (
         <div style={{
           background: "#fffbeb", borderBottom: `1px solid ${T.border}`,
           padding: ".55rem 1.25rem", display: "flex", alignItems: "center", gap: ".5rem",
         }}>
-          <span style={{ fontSize: ".82rem" }}>⚠️</span>
+          <span style={{ fontSize: ".82rem" }}>{"\u26A0\uFE0F"}</span>
           <p style={{ color: "#92610a", fontSize: ".78rem", margin: 0 }}>
             Sin cuenta — las tareas no se guardarán.{" "}
             <button onClick={() => { setUser(null); setTasks({}); }} style={{
@@ -1554,21 +1871,21 @@ export default function App() {
           background: T.bgCard, borderBottom: `1px solid ${T.borderGray}`,
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <button onClick={prevMonth} style={{
+          <button onClick={prevMonth} aria-label="Mes anterior" style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.text, fontSize: "1.1rem", cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>‹</button>
+          }}>{"\u2039"}</button>
           <span style={{ fontWeight: 700, fontSize: "1rem", color: T.text }}>
             {activeView === "year" ? calYear : `${MONTHS_ES[calMonth]} ${calYear}`}
           </span>
-          <button onClick={nextMonth} style={{
+          <button onClick={nextMonth} aria-label="Mes siguiente" style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.text, fontSize: "1.1rem", cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>›</button>
+          }}>{"\u203A"}</button>
         </div>
       )}
 
@@ -1582,12 +1899,12 @@ export default function App() {
           <button onClick={() => {
             const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() - 7);
             setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }} style={{
+          }} aria-label="Semana anterior" style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.text, fontSize: "1.1rem", cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>‹</button>
+          }}>{"\u2039"}</button>
 
           <button onClick={() => setWeekStart(getWeekStart(todayStr()))} style={{
             background: weekStart === getWeekStart(todayStr()) ? T.accentLight : T.bg,
@@ -1600,12 +1917,12 @@ export default function App() {
           <button onClick={() => {
             const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() + 7);
             setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }} style={{
+          }} aria-label="Semana siguiente" style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.text, fontSize: "1.1rem", cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>›</button>
+          }}>{"\u203A"}</button>
         </div>
       )}
 
@@ -1619,12 +1936,12 @@ export default function App() {
           <button onClick={() => {
             const d = new Date(selectedDate + "T12:00:00"); d.setDate(d.getDate() - 1);
             setSelectedDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }} style={{
+          }} aria-label="Día anterior" style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.text, fontSize: "1.1rem", cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>‹</button>
+          }}>{"\u2039"}</button>
 
           <button onClick={() => setSelectedDate(today)} style={{
             background: selectedDate === today ? T.accentLight : T.bg,
@@ -1637,18 +1954,35 @@ export default function App() {
           <button onClick={() => {
             const d = new Date(selectedDate + "T12:00:00"); d.setDate(d.getDate() + 1);
             setSelectedDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }} style={{
+          }} aria-label="Día siguiente" style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.text, fontSize: "1.1rem", cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>›</button>
+          }}>{"\u203A"}</button>
         </div>
       )}
 
       {/* Main content */}
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {activeView === "day" && (
+        {/* Loading skeleton */}
+        {tasksLoading && activeView === "day" && (
+          <div style={{ padding: "1.25rem 1rem", maxWidth: "600px", margin: "0 auto" }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{
+                background: T.bgCard, borderRadius: "16px", padding: "1.1rem 1rem",
+                marginBottom: ".65rem", boxShadow: T.shadowCard,
+              }}>
+                <div style={{ height: "14px", width: `${55 + i * 12}%`, background: T.bgPage,
+                  borderRadius: "6px", animation: "pulse 1.2s infinite" }} />
+                <div style={{ height: "10px", width: "35%", background: T.bgPage,
+                  borderRadius: "4px", marginTop: ".6rem", animation: "pulse 1.2s infinite" }} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!tasksLoading && activeView === "day" && (
           <DayView date={selectedDate} tasks={tasks}
             onAddTask={() => setModal({ date: selectedDate })}
             onToggle={handleToggle}
@@ -1691,15 +2025,17 @@ export default function App() {
         paddingBottom: "env(safe-area-inset-bottom, 0)",
         position: "sticky", bottom: 0, zIndex: 20,
         boxShadow: "0 -2px 16px rgba(0,0,0,.06)",
-      }}>
+      }} role="tablist" aria-label="Navegación principal">
         {navItems.map(({ key, icon, label }) => {
           const active = activeView === key;
           return (
-            <button key={key} onClick={() => setActiveView(key)} style={{
-              flex: 1, padding: ".7rem .5rem .6rem", background: "none", border: "none",
-              cursor: "pointer", display: "flex", flexDirection: "column",
-              alignItems: "center", gap: ".2rem", position: "relative",
-            }}>
+            <button key={key} onClick={() => setActiveView(key)}
+              role="tab" aria-selected={active} aria-label={label}
+              style={{
+                flex: 1, padding: ".7rem .5rem .6rem", background: "none", border: "none",
+                cursor: "pointer", display: "flex", flexDirection: "column",
+                alignItems: "center", gap: ".2rem", position: "relative",
+              }}>
               {active && (
                 <span style={{
                   position: "absolute", top: 0, left: "25%", right: "25%",
@@ -1717,18 +2053,27 @@ export default function App() {
         })}
       </nav>
 
+      {/* Modals */}
       {modal && (
         <TaskModal date={modal.date} task={modal.task}
           onSave={(task) => persistTask(modal.date, task)}
           onClose={() => setModal(null)} />
       )}
-
       {movePicker && (
         <MoveTaskPicker
           currentDate={movePicker.date}
           onMove={(toDate) => moveTask(movePicker.date, toDate, movePicker.task.id)}
           onClose={() => setMovePicker(null)} />
       )}
+      {searchOpen && (
+        <SearchModal
+          tasks={tasks}
+          onSelectTask={(date) => { setSelectedDate(date); setActiveView("day"); }}
+          onClose={() => setSearchOpen(false)} />
+      )}
+
+      {/* Toasts */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
