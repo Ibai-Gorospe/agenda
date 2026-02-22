@@ -15,11 +15,20 @@ export default defineConfig({
         theme_color: "#f5f0e8",
         background_color: "#f5f0e8",
         display: "standalone",
+        orientation: "portrait",
         icons: [
           { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
           { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
           { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
           { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+        ],
+        shortcuts: [
+          {
+            name: "Nueva tarea",
+            short_name: "Nueva",
+            url: "/?action=new-task",
+            icons: [{ src: "icon-192.png", sizes: "192x192" }]
+          }
         ]
       },
       workbox: {
