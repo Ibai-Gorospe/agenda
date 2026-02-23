@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { T } from "../theme";
 import { CATEGORIES, PRIORITY_OPTIONS, GYM_ID } from "../constants";
-import { isWeekend, formatDateLabel, genId, getWeekdayName } from "../helpers";
+import { isWeekend, formatDateLabel, genId, recurrenceToDays, daysToRecurrence } from "../helpers";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
 export default function TaskModal({ date, task, onSave, onClose }) {
@@ -9,7 +9,8 @@ export default function TaskModal({ date, task, onSave, onClose }) {
   const [time, setTime] = useState(task?.time || "");
   const [reminder, setReminder] = useState(task?.reminder || "15");
   const [category, setCategory] = useState(task?.category || null);
-  const [recurrence, setRecurrence] = useState(task?.recurrence || "");
+  const [selectedDays, setSelectedDays] = useState(() => new Set(recurrenceToDays(task?.recurrence || "", date)));
+  const [isMonthly, setIsMonthly] = useState(task?.recurrence === "monthly");
   const [priority, setPriority] = useState(task?.priority || null);
   const [notes, setNotes] = useState(task?.notes || "");
   const [showNotes, setShowNotes] = useState(!!task?.notes);
@@ -28,8 +29,23 @@ export default function TaskModal({ date, task, onSave, onClose }) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const toggleDay = (dayNum) => {
+    setSelectedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(dayNum)) next.delete(dayNum); else next.add(dayNum);
+      return next;
+    });
+    if (isMonthly) setIsMonthly(false);
+  };
+
+  const handleMonthly = () => {
+    setIsMonthly(prev => !prev);
+    setSelectedDays(new Set());
+  };
+
   const save = () => {
     if (!text.trim()) return;
+    const recurrence = isMonthly ? "monthly" : daysToRecurrence([...selectedDays]);
     onSave({
       ...task,
       text: text.trim(), time, reminder,
@@ -160,31 +176,38 @@ export default function TaskModal({ date, task, onSave, onClose }) {
           </div>
         </div>
 
-        {/* Recurrence selector */}
+        {/* Recurrence selector — iPhone alarm style */}
         <div style={{ marginBottom: "1rem" }}>
           <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600,
             color: T.textSub, marginBottom: ".4rem" }}>Repetir</label>
-          <div style={{ display: "flex", gap: ".4rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: ".35rem", justifyContent: "space-between", marginBottom: ".5rem" }}>
             {[
-              { value: "", label: "Ninguna" },
-              { value: "daily", label: "Diaria" },
-              { value: "weekdays", label: "L — V" },
-              { value: "weekly", label: `Cada ${getWeekdayName(date)}` },
-              { value: "monthly", label: "Mensual" },
-            ].map(o => {
-              const active = recurrence === o.value;
-              const accentColor = weekend ? T.weekend : T.accent;
+              { label: "L", day: 1 }, { label: "M", day: 2 }, { label: "X", day: 3 },
+              { label: "J", day: 4 }, { label: "V", day: 5 }, { label: "S", day: 6 },
+              { label: "D", day: 0 },
+            ].map(({ label, day }) => {
+              const active = selectedDays.has(day);
+              const accentColor = category === GYM_ID ? T.gym : (weekend ? T.weekend : T.accent);
               return (
-                <button key={o.value} onClick={() => setRecurrence(o.value)} style={{
-                  padding: ".35rem .7rem", borderRadius: "20px", fontSize: ".78rem", fontWeight: 600,
-                  cursor: "pointer", transition: "all .15s",
-                  background: active ? (o.value ? `${accentColor}18` : T.bgPage) : "transparent",
-                  border: `1.5px solid ${active ? accentColor : T.borderGray}`,
-                  color: active ? (o.value ? accentColor : T.text) : T.textMuted,
-                }}>{o.value === "weekly" ? `🔄 ${o.label}` : o.label}</button>
+                <button key={day} onClick={() => toggleDay(day)} style={{
+                  width: "38px", height: "38px", borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: ".8rem", fontWeight: 700, cursor: "pointer",
+                  transition: "all .15s",
+                  background: active ? accentColor : "transparent",
+                  border: `2px solid ${active ? accentColor : T.borderGray}`,
+                  color: active ? "#fff" : T.textMuted,
+                }}>{label}</button>
               );
             })}
           </div>
+          <button onClick={handleMonthly} style={{
+            padding: ".35rem .7rem", borderRadius: "20px", fontSize: ".78rem", fontWeight: 600,
+            cursor: "pointer", transition: "all .15s",
+            background: isMonthly ? `${weekend ? T.weekend : T.accent}18` : "transparent",
+            border: `1.5px solid ${isMonthly ? (weekend ? T.weekend : T.accent) : T.borderGray}`,
+            color: isMonthly ? (weekend ? T.weekend : T.accent) : T.textMuted,
+          }}>Cada mes</button>
         </div>
 
         {/* Notes */}

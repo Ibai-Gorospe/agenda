@@ -3,8 +3,8 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor, 
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { T } from "../theme";
-import { getCat, RECURRENCE_LABELS, CATEGORIES, getPriorityColor, GYM_ID } from "../constants";
-import { todayStr, formatDateLabel, isWeekend } from "../helpers";
+import { getCat, CATEGORIES, getPriorityColor, GYM_ID } from "../constants";
+import { todayStr, formatDateLabel, isWeekend, getRecurrenceLabel } from "../helpers";
 import Badge from "./Badge";
 
 /* ━━━ Regular Task Card ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -116,7 +116,7 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
             {task.recurrence && (
               <Badge color={task.done ? T.textMuted : (weekend ? T.weekend : T.accentDark)}
                 bg={task.done ? T.doneBg : (weekend ? T.weekendLight : T.accentLight)}>
-                {"🔄 "}{RECURRENCE_LABELS[task.recurrence] || task.recurrence}
+                {"🔄 "}{getRecurrenceLabel(task.recurrence)}
               </Badge>
             )}
             {task.priority && (
@@ -295,7 +295,7 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
           <div style={{ display: "flex", alignItems: "center", gap: ".4rem", flexWrap: "wrap", flex: 1, minWidth: 0 }}>
             {task.recurrence && (
               <Badge color={task.done ? T.textMuted : T.gymDark} bg={task.done ? T.doneBg : "rgba(139,92,246,.08)"}>
-                {"🔄 "}{RECURRENCE_LABELS[task.recurrence] || task.recurrence}
+                {"🔄 "}{getRecurrenceLabel(task.recurrence)}
               </Badge>
             )}
             {task.priority && (
