@@ -212,7 +212,7 @@ export default function App() {
       return newState;
     });
 
-    if (user && !user.guest) {
+    if (user && !user.guest && updatedTask) {
       await withSync(async () => {
         await upsertTask(user.id, date, updatedTask);
         if (nextDate && nextTask) {

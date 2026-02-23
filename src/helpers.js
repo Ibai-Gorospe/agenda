@@ -59,6 +59,9 @@ export const genId = () => {
   }); }
 };
 
+const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+export const getWeekdayName = (dateStr) => WEEKDAY_NAMES[new Date(dateStr + "T12:00:00").getDay()];
+
 export const dateAdd = (dateStr, days) => {
   const d = new Date(dateStr + "T12:00:00");
   d.setDate(d.getDate() + days);

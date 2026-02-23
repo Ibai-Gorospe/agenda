@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { T } from "../theme";
-import { CATEGORIES, RECURRENCE_OPTIONS, PRIORITY_OPTIONS, GYM_ID } from "../constants";
-import { isWeekend, formatDateLabel, genId } from "../helpers";
+import { CATEGORIES, PRIORITY_OPTIONS, GYM_ID } from "../constants";
+import { isWeekend, formatDateLabel, genId, getWeekdayName } from "../helpers";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
 export default function TaskModal({ date, task, onSave, onClose }) {
@@ -163,13 +163,28 @@ export default function TaskModal({ date, task, onSave, onClose }) {
         {/* Recurrence selector */}
         <div style={{ marginBottom: "1rem" }}>
           <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600,
-            color: T.textSub, marginBottom: ".35rem" }}>Repetir</label>
-          <select value={recurrence} onChange={e => setRecurrence(e.target.value)}
-            style={{ ...inputStyle, background: T.bg }}>
-            {RECURRENCE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            color: T.textSub, marginBottom: ".4rem" }}>Repetir</label>
+          <div style={{ display: "flex", gap: ".4rem", flexWrap: "wrap" }}>
+            {[
+              { value: "", label: "Ninguna" },
+              { value: "daily", label: "Diaria" },
+              { value: "weekdays", label: "L — V" },
+              { value: "weekly", label: `Cada ${getWeekdayName(date)}` },
+              { value: "monthly", label: "Mensual" },
+            ].map(o => {
+              const active = recurrence === o.value;
+              const accentColor = weekend ? T.weekend : T.accent;
+              return (
+                <button key={o.value} onClick={() => setRecurrence(o.value)} style={{
+                  padding: ".35rem .7rem", borderRadius: "20px", fontSize: ".78rem", fontWeight: 600,
+                  cursor: "pointer", transition: "all .15s",
+                  background: active ? (o.value ? `${accentColor}18` : T.bgPage) : "transparent",
+                  border: `1.5px solid ${active ? accentColor : T.borderGray}`,
+                  color: active ? (o.value ? accentColor : T.text) : T.textMuted,
+                }}>{o.value === "weekly" ? `🔄 ${o.label}` : o.label}</button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Notes */}
