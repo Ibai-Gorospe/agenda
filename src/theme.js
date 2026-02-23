@@ -37,6 +37,15 @@ export const T = {
   doneBg: "#faf7f0",
   danger: "#e05252",
 
+  // Gym / Workout
+  gym: "#8b5cf6",
+  gymDark: "#7c3aed",
+  gymLight: "#f5f3ff",
+  gymBg: "#faf8ff",
+  gymGrad: "linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)",
+  gymBorder: "rgba(139,92,246,.12)",
+  gymShadow: "0 2px 8px rgba(139,92,246,.08), 0 4px 16px rgba(0,0,0,.03)",
+
   // Font
   font: "'Georgia', 'Times New Roman', serif",
   fontSans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",

@@ -604,6 +604,7 @@ export default function App() {
           {!tasksLoading && activeView === "day" && (
             <DayView date={selectedDate} tasks={tasks}
               onAddTask={() => setModal({ date: selectedDate })}
+              onAddWorkout={() => setModal({ date: selectedDate, task: { category: "gym" } })}
               onToggle={handleToggle}
               onEdit={(date, task) => setModal({ date, task })}
               onDelete={handleDelete}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { T } from "../theme";
-import { CATEGORIES, RECURRENCE_OPTIONS, PRIORITY_OPTIONS } from "../constants";
+import { CATEGORIES, RECURRENCE_OPTIONS, PRIORITY_OPTIONS, GYM_ID } from "../constants";
 import { isWeekend, formatDateLabel, genId } from "../helpers";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
@@ -86,8 +86,8 @@ export default function TaskModal({ date, task, onSave, onClose }) {
 
         <textarea ref={inputRef} value={text} onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } }}
-          placeholder="¿Qué tienes que hacer?" rows={2}
-          aria-label="Descripción de la tarea"
+          placeholder={category === GYM_ID ? "Nombre del entrenamiento..." : "¿Qué tienes que hacer?"} rows={2}
+          aria-label={category === GYM_ID ? "Nombre del entrenamiento" : "Descripción de la tarea"}
           style={{ ...inputStyle, resize: "none", marginBottom: "1rem", fontFamily: "inherit" }} />
 
         <div style={{ display: "flex", gap: ".75rem", marginBottom: "1rem" }}>
@@ -155,7 +155,7 @@ export default function TaskModal({ date, task, onSave, onClose }) {
                 background: category === c.id ? c.bg : "transparent",
                 border: `1.5px solid ${category === c.id ? c.color : T.borderGray}`,
                 color: category === c.id ? c.color : T.textMuted,
-              }}>{c.label}</button>
+              }}>{c.id === GYM_ID ? "💪 " + c.label : c.label}</button>
             ))}
           </div>
         </div>
@@ -189,10 +189,10 @@ export default function TaskModal({ date, task, onSave, onClose }) {
           </div>
         )}
 
-        {/* Subtasks */}
+        {/* Subtasks / Exercises */}
         <div style={{ marginBottom: "1.2rem" }}>
           <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600,
-            color: T.textSub, marginBottom: ".4rem" }}>Subtareas</label>
+            color: T.textSub, marginBottom: ".4rem" }}>{category === GYM_ID ? "Ejercicios" : "Subtareas"}</label>
           {subtasks.map(s => (
             <div key={s.id} style={{
               display: "flex", alignItems: "center", gap: ".5rem",
@@ -220,7 +220,7 @@ export default function TaskModal({ date, task, onSave, onClose }) {
           <div style={{ display: "flex", gap: ".5rem", marginTop: ".4rem" }}>
             <input type="text" value={newSubtask} onChange={e => setNewSubtask(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
-              placeholder="Añadir subtarea..."
+              placeholder={category === GYM_ID ? "Añadir ejercicio..." : "Añadir subtarea..."}
               style={{ ...inputStyle, flex: 1, padding: ".5rem .75rem", fontSize: ".85rem" }} />
             <button onClick={addSubtask} style={{
               background: T.bg, border: `1.5px solid ${T.borderGray}`,

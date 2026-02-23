@@ -5,7 +5,9 @@ export const CATEGORIES = [
   { id: "salud",    label: "Salud",    color: "#16a34a", bg: "#f0fdf4" },
   { id: "estudio",  label: "Estudio",  color: "#d97706", bg: "#fffbeb" },
   { id: "hogar",    label: "Hogar",    color: "#e05252", bg: "#fef2f2" },
+  { id: "gym",      label: "Entreno",  color: "#8b5cf6", bg: "#f5f3ff" },
 ];
+export const GYM_ID = "gym";
 export const getCat = (id) => CATEGORIES.find(c => c.id === id);
 
 export const RECURRENCE_OPTIONS = [
