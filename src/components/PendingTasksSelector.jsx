@@ -1,5 +1,6 @@
 import { useState, memo } from "react";
 import { T } from "../theme";
+import { X, Check } from "lucide-react";
 import { formatDateLabel } from "../helpers";
 import { getCat, getPriorityColor } from "../constants";
 
@@ -22,7 +23,7 @@ function PendingTasksSelector({ pendingGroups, onMove, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.45)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
       display: "flex", alignItems: "flex-end", justifyContent: "center",
       zIndex: 100,
     }}>
@@ -42,11 +43,11 @@ function PendingTasksSelector({ pendingGroups, onMove, onClose }) {
               Tareas pendientes
             </h3>
             <button onClick={onClose} style={{
-              background: T.bg, border: "none", borderRadius: "8px",
+              background: T.bg, border: "none", borderRadius: T.r2,
               width: "32px", height: "32px", cursor: "pointer",
-              fontSize: "1rem", color: T.textMuted,
+              color: T.textMuted,
               display: "flex", alignItems: "center", justifyContent: "center",
-            }}>✕</button>
+            }}><X size={16} /></button>
           </div>
 
           {/* Select all toggle */}
@@ -56,14 +57,14 @@ function PendingTasksSelector({ pendingGroups, onMove, onClose }) {
             padding: ".5rem 0 0", display: "flex", alignItems: "center", gap: ".4rem",
           }}>
             <span style={{
-              width: "18px", height: "18px", borderRadius: "5px",
+              width: "18px", height: "18px", borderRadius: T.r1,
               border: `2px solid ${selected.size === allTasks.length ? T.accent : T.borderGray}`,
               background: selected.size === allTasks.length ? T.accentGrad : "transparent",
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               flexShrink: 0, transition: "all .15s",
             }}>
               {selected.size === allTasks.length && (
-                <span style={{ color: "#fff", fontSize: ".55rem", fontWeight: 800 }}>✓</span>
+                <Check size={10} color={T.textOnAccent} strokeWidth={3} />
               )}
             </span>
             {selected.size === allTasks.length ? "Deseleccionar todas" : "Seleccionar todas"}
@@ -89,7 +90,7 @@ function PendingTasksSelector({ pendingGroups, onMove, onClose }) {
                 return (
                   <button key={task.id} onClick={() => toggleTask(task.id)} style={{
                     width: "100%", display: "flex", alignItems: "center", gap: ".6rem",
-                    padding: ".55rem .5rem", borderRadius: "10px",
+                    padding: ".55rem .5rem", borderRadius: T.r3,
                     background: isSelected ? T.accentLight : "transparent",
                     border: "none", cursor: "pointer", textAlign: "left",
                     transition: "background .15s",
@@ -104,7 +105,7 @@ function PendingTasksSelector({ pendingGroups, onMove, onClose }) {
                       flexShrink: 0, transition: "all .15s",
                     }}>
                       {isSelected && (
-                        <span style={{ color: "#fff", fontSize: ".55rem", fontWeight: 800 }}>✓</span>
+                        <Check size={12} color={T.textOnAccent} strokeWidth={3} />
                       )}
                     </span>
 
@@ -145,11 +146,11 @@ function PendingTasksSelector({ pendingGroups, onMove, onClose }) {
             style={{
               width: "100%", padding: ".75rem",
               background: selected.size > 0 ? T.accentGrad : T.bg,
-              border: "none", borderRadius: "12px",
+              border: "none", borderRadius: T.r3,
               color: selected.size > 0 ? T.textOnAccent : T.textMuted,
               fontWeight: 700, fontSize: ".92rem",
               cursor: selected.size > 0 ? "pointer" : "default",
-              boxShadow: selected.size > 0 ? "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))" : "none",
+              boxShadow: selected.size > 0 ? "0 2px 8px var(--accent-shadow)" : "none",
               transition: "all .15s",
             }}>
             {selected.size > 0

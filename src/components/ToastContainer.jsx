@@ -1,4 +1,5 @@
 import { T } from "../theme";
+import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
 
 export default function ToastContainer({ toasts, onDismiss }) {
   return (
@@ -10,13 +11,17 @@ export default function ToastContainer({ toasts, onDismiss }) {
       {toasts.map(t => (
         <div key={t.id} className={t.exiting ? "toast-exit" : "toast-enter"} role="alert" style={{
           background: t.type === "error" ? T.dangerBg : t.type === "success" ? T.successBg : T.accentLight,
-          border: `1.5px solid ${t.type === "error" ? "rgba(224,82,82,.25)" : t.type === "success" ? "rgba(74,186,106,.25)" : T.border}`,
-          borderRadius: "14px", padding: ".7rem 1rem", maxWidth: "400px", width: "100%",
-          boxShadow: "0 4px 20px rgba(0,0,0,.12)", pointerEvents: "auto",
+          border: `1.5px solid ${t.type === "error" ? `${T.danger}40` : t.type === "success" ? `${T.success}40` : T.border}`,
+          borderRadius: T.r3, padding: ".7rem 1rem", maxWidth: "400px", width: "100%",
+          boxShadow: T.shadowFloat, pointerEvents: "auto",
           display: "flex", alignItems: "center", gap: ".6rem",
         }}>
-          <span style={{ fontSize: ".9rem", flexShrink: 0 }}>
-            {t.type === "error" ? "!" : t.type === "success" ? "\u2713" : "\u24D8"}
+          <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+            {t.type === "error"
+              ? <AlertCircle size={16} style={{ color: T.danger }} />
+              : t.type === "success"
+                ? <CheckCircle size={16} style={{ color: T.success }} />
+                : <Info size={16} style={{ color: T.accent }} />}
           </span>
           <span style={{
             flex: 1, fontSize: ".84rem", lineHeight: 1.3,
@@ -24,16 +29,17 @@ export default function ToastContainer({ toasts, onDismiss }) {
           }}>{t.message}</span>
           {t.action && (
             <button onClick={t.action.fn} style={{
-              background: t.type === "error" ? "rgba(224,82,82,.12)" : T.accentLight,
-              border: "none", borderRadius: "8px", padding: ".35rem .65rem",
+              background: t.type === "error" ? T.dangerBg : T.accentLight,
+              border: "none", borderRadius: T.r2, padding: ".35rem .65rem",
               color: t.type === "error" ? T.danger : T.accentDark,
               fontWeight: 700, fontSize: ".78rem", cursor: "pointer", flexShrink: 0,
             }}>{t.action.label}</button>
           )}
           <button onClick={() => onDismiss(t.id)} aria-label="Cerrar" style={{
             background: "none", border: "none", color: T.textMuted,
-            cursor: "pointer", fontSize: ".9rem", padding: "2px", flexShrink: 0,
-          }}>{"\u2715"}</button>
+            cursor: "pointer", padding: "2px", flexShrink: 0,
+            display: "flex", alignItems: "center",
+          }}><X size={14} /></button>
         </div>
       ))}
     </div>

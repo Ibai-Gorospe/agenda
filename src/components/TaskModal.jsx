@@ -3,6 +3,7 @@ import { T } from "../theme";
 import { CATEGORIES, PRIORITY_OPTIONS, GYM_ID } from "../constants";
 import { isWeekend, formatDateLabel, genId, recurrenceToDays, daysToRecurrence } from "../helpers";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { X, Dumbbell, Check, Plus } from "lucide-react";
 
 export default function TaskModal({ date, task, onSave, onClose }) {
   const [text, setText] = useState(task?.text || "");
@@ -77,18 +78,18 @@ export default function TaskModal({ date, task, onSave, onClose }) {
   const inputStyle = {
     width: "100%", padding: ".8rem 1rem",
     background: T.bg, border: `1.5px solid ${T.borderGray}`,
-    borderRadius: "12px", color: T.text, fontSize: "1rem", outline: "none",
+    borderRadius: T.r3, color: T.text, fontSize: "1rem", outline: "none",
   };
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
       zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center",
     }}>
       <div ref={modalRef} className="modal-sheet" onClick={e => e.stopPropagation()}
         role="dialog" aria-modal="true" aria-label={task?.id ? "Editar tarea" : "Nueva tarea"}
         style={{
-          background: T.bgModal, borderRadius: "24px 24px 0 0",
+          background: T.bgModal, borderRadius: `${T.r6} ${T.r6} 0 0`,
           padding: "1.5rem 1.5rem 2.5rem", width: "100%", maxWidth: "500px",
           boxShadow: T.shadowFloat, maxHeight: "85vh", overflowY: "auto",
         }}>
@@ -96,8 +97,8 @@ export default function TaskModal({ date, task, onSave, onClose }) {
           borderRadius: "2px", margin: "0 auto 1.2rem" }} />
 
         <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1.2rem",
-          color: weekend ? T.weekend : T.accent }}>
-          {task?.id ? "Editar tarea" : "Nueva tarea"} · {formatDateLabel(date).split(",")[0]}
+          color: T.text }}>
+          {task?.id ? "Editar tarea" : "Nueva tarea"} <span style={{ color: T.textMuted, fontWeight: 400 }}>· {formatDateLabel(date).split(",")[0]}</span>
         </h3>
 
         <textarea ref={inputRef} value={text} onChange={e => setText(e.target.value)}
@@ -171,7 +172,7 @@ export default function TaskModal({ date, task, onSave, onClose }) {
                 background: category === c.id ? c.bg : "transparent",
                 border: `1.5px solid ${category === c.id ? c.color : T.borderGray}`,
                 color: category === c.id ? c.color : T.textMuted,
-              }}>{c.id === GYM_ID ? "💪 " + c.label : c.label}</button>
+              }}>{c.label}</button>
             ))}
           </div>
         </div>
@@ -196,7 +197,7 @@ export default function TaskModal({ date, task, onSave, onClose }) {
                   transition: "all .15s",
                   background: active ? accentColor : "transparent",
                   border: `2px solid ${active ? accentColor : T.borderGray}`,
-                  color: active ? "#fff" : T.textMuted,
+                  color: active ? T.textOnAccent : T.textMuted,
                 }}>{label}</button>
               );
             })}
@@ -237,12 +238,12 @@ export default function TaskModal({ date, task, onSave, onClose }) {
               padding: ".35rem 0", borderBottom: `1px solid ${T.borderGray}`,
             }}>
               <button onClick={() => toggleSubtask(s.id)} style={{
-                width: "22px", height: "22px", borderRadius: "6px", flexShrink: 0,
+                width: "22px", height: "22px", borderRadius: T.r1, flexShrink: 0,
                 border: `2px solid ${s.done ? T.accent : T.borderGray}`,
                 background: s.done ? T.accentGrad : "transparent",
                 cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                {s.done && <span style={{ color: "#fff", fontSize: ".65rem", fontWeight: 800 }}>✓</span>}
+                {s.done && <Check size={12} color="#fff" strokeWidth={3} />}
               </button>
               <span style={{
                 flex: 1, fontSize: ".85rem",
@@ -251,8 +252,9 @@ export default function TaskModal({ date, task, onSave, onClose }) {
               }}>{s.text}</span>
               <button onClick={() => removeSubtask(s.id)} style={{
                 background: "none", border: "none", color: T.textMuted,
-                cursor: "pointer", fontSize: ".75rem", padding: "2px",
-              }}>{"\u2715"}</button>
+                cursor: "pointer", padding: "2px",
+                display: "flex", alignItems: "center",
+              }}><X size={14} /></button>
             </div>
           ))}
           <div style={{ display: "flex", gap: ".5rem", marginTop: ".4rem" }}>
@@ -262,25 +264,26 @@ export default function TaskModal({ date, task, onSave, onClose }) {
               style={{ ...inputStyle, flex: 1, padding: ".5rem .75rem", fontSize: ".85rem" }} />
             <button onClick={addSubtask} style={{
               background: T.bg, border: `1.5px solid ${T.borderGray}`,
-              borderRadius: "10px", color: T.accent, padding: ".5rem .75rem",
-              cursor: "pointer", fontWeight: 700, fontSize: ".85rem", flexShrink: 0,
-            }}>+</button>
+              borderRadius: T.r3, color: T.accent, padding: ".5rem .75rem",
+              cursor: "pointer", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><Plus size={18} /></button>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: ".75rem" }}>
           <button onClick={onClose} style={{
             flex: 1, padding: ".85rem", background: T.bg,
-            border: "none", borderRadius: "12px", color: T.textSub,
+            border: "none", borderRadius: T.r3, color: T.textSub,
             fontWeight: 600, fontSize: ".95rem", cursor: "pointer",
           }}>Cancelar</button>
           <button onClick={save} style={{
             flex: 2, padding: ".85rem", background: weekend
               ? "var(--weekend-grad)"
               : T.accentGrad,
-            border: "none", borderRadius: "12px", color: T.textOnAccent,
+            border: "none", borderRadius: T.r3, color: T.textOnAccent,
             fontWeight: 700, fontSize: ".95rem", cursor: "pointer",
-            boxShadow: weekend ? "0 4px 16px rgba(224,123,84,.35)" : "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
+            boxShadow: `0 4px 16px var(--accent-shadow)`,
           }}>Guardar</button>
         </div>
       </div>

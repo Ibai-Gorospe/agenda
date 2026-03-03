@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { T } from "../theme";
+import { X } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { pad } from "../helpers";
 
@@ -67,13 +68,13 @@ export default function StatsView({ tasks, today, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
       zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center",
     }}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()}
         role="dialog" aria-modal="true" aria-label="Estadísticas"
         style={{
-          background: T.bgModal, borderRadius: "24px 24px 0 0",
+          background: T.bgModal, borderRadius: `${T.r6} ${T.r6} 0 0`,
           padding: "1.5rem 1.5rem 2.5rem", width: "100%", maxWidth: "500px",
           boxShadow: T.shadowFloat, maxHeight: "85vh", overflowY: "auto",
         }}>
@@ -81,26 +82,27 @@ export default function StatsView({ tasks, today, onClose }) {
           borderRadius: "2px", margin: "0 auto 1.2rem" }} />
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.2rem" }}>
-          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: T.text, fontFamily: T.font, margin: 0 }}>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: T.text, margin: 0 }}>
             Estadísticas
           </h3>
           <button onClick={onClose} aria-label="Cerrar" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".88rem",
-          }}>{"\u2715"}</button>
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}><X size={16} /></button>
         </div>
 
         {/* Summary cards */}
         <div style={{ display: "flex", gap: ".6rem", marginBottom: "1.2rem" }}>
-          <div style={{ flex: 1, background: T.bgCard, borderRadius: "16px", padding: ".9rem .7rem", boxShadow: T.shadowCard, textAlign: "center" }}>
+          <div style={{ flex: 1, background: T.bgCard, borderRadius: T.r4, padding: ".9rem .7rem", boxShadow: T.shadowCard, textAlign: "center" }}>
             <div style={{ fontSize: ".7rem", color: T.textMuted, fontWeight: 600, letterSpacing: ".03em" }}>COMPLETADAS</div>
             <div style={{ fontSize: "1.5rem", fontWeight: 700, color: T.accent }}>{stats.totalDone}</div>
           </div>
-          <div style={{ flex: 1, background: T.bgCard, borderRadius: "16px", padding: ".9rem .7rem", boxShadow: T.shadowCard, textAlign: "center" }}>
+          <div style={{ flex: 1, background: T.bgCard, borderRadius: T.r4, padding: ".9rem .7rem", boxShadow: T.shadowCard, textAlign: "center" }}>
             <div style={{ fontSize: ".7rem", color: T.textMuted, fontWeight: 600, letterSpacing: ".03em" }}>PENDIENTES</div>
             <div style={{ fontSize: "1.5rem", fontWeight: 700, color: T.danger }}>{stats.totalPending}</div>
           </div>
-          <div style={{ flex: 1, background: T.bgCard, borderRadius: "16px", padding: ".9rem .7rem", boxShadow: T.shadowCard, textAlign: "center" }}>
+          <div style={{ flex: 1, background: T.bgCard, borderRadius: T.r4, padding: ".9rem .7rem", boxShadow: T.shadowCard, textAlign: "center" }}>
             <div style={{ fontSize: ".7rem", color: T.textMuted, fontWeight: 600, letterSpacing: ".03em" }}>RACHA</div>
             <div style={{ fontSize: "1.5rem", fontWeight: 700, color: stats.completionStreak > 0 ? T.success : T.textMuted }}>{stats.completionStreak}</div>
             <div style={{ fontSize: ".65rem", color: T.textMuted }}>días</div>
@@ -109,14 +111,14 @@ export default function StatsView({ tasks, today, onClose }) {
 
         {/* This week vs last week */}
         <div style={{
-          background: T.bgCard, borderRadius: "16px", padding: "1rem 1.2rem",
+          background: T.bgCard, borderRadius: T.r4, padding: "1rem 1.2rem",
           boxShadow: T.shadowCard, marginBottom: "1rem",
         }}>
           <h4 style={{ fontSize: ".82rem", fontWeight: 700, color: T.text, marginBottom: ".6rem" }}>Esta semana vs anterior</h4>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: ".72rem", color: T.textMuted, marginBottom: ".2rem" }}>Esta semana</div>
-              <div style={{ height: "8px", background: T.bgPage, borderRadius: "4px" }}>
+              <div style={{ height: "6px", background: T.bgPage, borderRadius: "4px" }}>
                 <div style={{
                   height: "100%", borderRadius: "4px", background: T.accentGrad,
                   width: `${Math.min(100, (stats.thisWeekDone / Math.max(stats.thisWeekDone, stats.lastWeekDone, 1)) * 100)}%`,
@@ -127,7 +129,7 @@ export default function StatsView({ tasks, today, onClose }) {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: ".72rem", color: T.textMuted, marginBottom: ".2rem" }}>Semana anterior</div>
-              <div style={{ height: "8px", background: T.bgPage, borderRadius: "4px" }}>
+              <div style={{ height: "6px", background: T.bgPage, borderRadius: "4px" }}>
                 <div style={{
                   height: "100%", borderRadius: "4px", background: T.textMuted,
                   width: `${Math.min(100, (stats.lastWeekDone / Math.max(stats.thisWeekDone, stats.lastWeekDone, 1)) * 100)}%`,
@@ -141,7 +143,7 @@ export default function StatsView({ tasks, today, onClose }) {
 
         {/* By category */}
         <div style={{
-          background: T.bgCard, borderRadius: "16px", padding: "1rem 1.2rem",
+          background: T.bgCard, borderRadius: T.r4, padding: "1rem 1.2rem",
           boxShadow: T.shadowCard, marginBottom: "1rem",
         }}>
           <h4 style={{ fontSize: ".82rem", fontWeight: 700, color: T.text, marginBottom: ".6rem" }}>Por categoría</h4>
@@ -168,7 +170,7 @@ export default function StatsView({ tasks, today, onClose }) {
 
         {/* Best day */}
         <div style={{
-          background: T.bgCard, borderRadius: "16px", padding: "1rem 1.2rem",
+          background: T.bgCard, borderRadius: T.r4, padding: "1rem 1.2rem",
           boxShadow: T.shadowCard,
         }}>
           <h4 style={{ fontSize: ".82rem", fontWeight: 700, color: T.text, marginBottom: ".6rem" }}>Productividad por día</h4>

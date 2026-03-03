@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
 import { T } from "../theme";
+import { CalendarCheck } from "lucide-react";
 
 export default function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState("login"); // "login" | "registro" | "reset"
@@ -40,7 +41,7 @@ export default function LoginScreen({ onLogin }) {
   const inputStyle = {
     width: "100%", padding: ".85rem 1rem", marginBottom: ".85rem",
     background: T.bg, border: `1.5px solid ${T.borderGray}`,
-    borderRadius: "12px", color: T.text, fontSize: "1rem", outline: "none",
+    borderRadius: T.r3, color: T.text, fontSize: "1rem", outline: "none",
     transition: "border-color .15s",
   };
 
@@ -53,21 +54,21 @@ export default function LoginScreen({ onLogin }) {
     }}>
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
         <div style={{
-          width: "72px", height: "72px", borderRadius: "22px",
+          width: "72px", height: "72px", borderRadius: T.r6,
           background: T.accentGrad, display: "flex", alignItems: "center",
           justifyContent: "center", margin: "0 auto 1rem",
-          boxShadow: "0 8px 24px var(--accent-shadow, rgba(240,180,41,.3))",
+          boxShadow: `0 8px 24px var(--accent-shadow)`,
         }}>
-          <span style={{ fontSize: "2rem" }}>📅</span>
+          <CalendarCheck size={32} color="#fff" />
         </div>
-        <h1 style={{ fontSize: "1.9rem", fontWeight: 700, color: T.text, fontFamily: T.font, margin: 0 }}>Agenda</h1>
+        <h1 style={{ fontSize: "1.9rem", fontWeight: 700, color: T.text, margin: 0 }}>Agenda</h1>
         <p style={{ color: T.textMuted, fontSize: ".88rem", marginTop: ".3rem" }}>Tu tiempo, tu orden</p>
       </div>
 
       <div style={{
-        background: T.bgCard, borderRadius: "24px", padding: "2rem",
+        background: T.bgCard, borderRadius: T.r6, padding: "2rem",
         width: "100%", maxWidth: "380px",
-        boxShadow: "0 4px 32px rgba(0,0,0,.1)",
+        boxShadow: T.shadowFloat,
       }}>
         {mode === "reset" ? (
           <>
@@ -80,7 +81,7 @@ export default function LoginScreen({ onLogin }) {
                   Se ha enviado un enlace a <strong>{email}</strong>. Revisa tu bandeja de entrada.
                 </p>
                 <button onClick={() => { setMode("login"); setResetSent(false); setError(""); }} style={{
-                  background: T.bg, border: "none", borderRadius: "10px",
+                  background: T.bg, border: "none", borderRadius: T.r3,
                   color: T.accentDark, padding: ".6rem 1.2rem", cursor: "pointer",
                   fontWeight: 600, fontSize: ".88rem",
                 }}>Volver al login</button>
@@ -97,9 +98,9 @@ export default function LoginScreen({ onLogin }) {
                 {error && <p style={{ color: T.danger, fontSize: ".83rem", marginBottom: ".8rem", textAlign: "center" }}>{error}</p>}
                 <button type="submit" disabled={loading} style={{
                   width: "100%", padding: ".9rem", background: T.accentGrad,
-                  border: "none", borderRadius: "12px", color: T.textOnAccent,
+                  border: "none", borderRadius: T.r3, color: T.textOnAccent,
                   fontWeight: 700, fontSize: "1rem", cursor: "pointer",
-                  boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
+                  boxShadow: "0 4px 16px var(--accent-shadow)",
                   opacity: loading ? .75 : 1,
                 }}>{loading ? "..." : "Enviar enlace"}</button>
                 <button type="button" onClick={() => { setMode("login"); setError(""); }} style={{
@@ -112,12 +113,12 @@ export default function LoginScreen({ onLogin }) {
         ) : (
           <>
             <div style={{
-              display: "flex", background: T.bg, borderRadius: "12px",
+              display: "flex", background: T.bg, borderRadius: T.r3,
               padding: "4px", marginBottom: "1.5rem", gap: "4px",
             }}>
               {["login", "registro"].map(m => (
                 <button key={m} onClick={() => { setMode(m); setError(""); }} style={{
-                  flex: 1, padding: ".55rem", borderRadius: "9px", border: "none", cursor: "pointer",
+                  flex: 1, padding: ".55rem", borderRadius: T.r2, border: "none", cursor: "pointer",
                   background: mode === m ? T.bgCard : "transparent",
                   color: mode === m ? T.text : T.textMuted,
                   fontWeight: mode === m ? 600 : 400, fontSize: ".9rem",
@@ -141,7 +142,7 @@ export default function LoginScreen({ onLogin }) {
 
               <button type="submit" disabled={loading} style={{
                 width: "100%", padding: ".9rem", background: T.accentGrad,
-                border: "none", borderRadius: "12px", color: T.textOnAccent,
+                border: "none", borderRadius: T.r3, color: T.textOnAccent,
                 fontWeight: 700, fontSize: "1rem", cursor: "pointer",
                 boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))", opacity: loading ? .75 : 1,
                 transition: "opacity .15s",
@@ -159,7 +160,7 @@ export default function LoginScreen({ onLogin }) {
               <div style={{ height: "1px", background: T.borderGray, marginBottom: "1.2rem" }} />
               <button onClick={() => onLogin({ id: "guest", email: "invitado", guest: true })} style={{
                 background: "none", border: `1.5px solid ${T.borderGray}`,
-                borderRadius: "12px", color: T.textSub, padding: ".75rem 1.5rem",
+                borderRadius: T.r3, color: T.textSub, padding: ".75rem 1.5rem",
                 width: "100%", cursor: "pointer", fontSize: ".9rem", fontWeight: 500,
               }}>Continuar sin cuenta</button>
               <p style={{ color: T.textMuted, fontSize: ".75rem", marginTop: ".5rem" }}>

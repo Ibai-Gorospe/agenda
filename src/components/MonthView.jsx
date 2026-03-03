@@ -35,19 +35,19 @@ function MonthView({ year, month, tasks, onSelectDay, today }) {
             <button key={dateStr} onClick={() => onSelectDay(dateStr)}
               aria-label={`${d} de ${new Date(year, month).toLocaleDateString("es-ES", { month: "long" })}${dayTasks.length ? `, ${pending} pendientes` : ""}`}
               style={{
-                padding: ".3rem .1rem", borderRadius: "10px", cursor: "pointer",
+                padding: ".3rem .1rem", borderRadius: T.r3, cursor: "pointer",
                 background: isToday
                   ? T.accentGrad
                   : weekend ? T.weekendLight : T.bgCard,
                 border: isToday ? "none"
                   : weekend ? `1.5px solid ${T.weekendBorder}`
                   : `1.5px solid ${T.borderGray}`,
-                color: isToday ? "#fff" : weekend ? T.weekend : T.text,
+                color: isToday ? T.textOnAccent : weekend ? T.weekend : T.text,
                 fontWeight: isToday ? 700 : weekend ? 600 : 400,
                 fontSize: ".88rem", aspectRatio: "1",
                 display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", gap: "2px",
-                boxShadow: isToday ? "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))" : "none",
+                boxShadow: isToday ? "0 2px 8px var(--accent-shadow)" : "none",
               }}>
               {d}
               {dayTasks.length > 0 && (

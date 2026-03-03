@@ -16,7 +16,7 @@ export default function MoveTaskPicker({ currentDate, onMove, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
       zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center",
     }}>
       <div ref={modalRef} className="modal-sheet" onClick={e => e.stopPropagation()}
@@ -29,24 +29,24 @@ export default function MoveTaskPicker({ currentDate, onMove, onClose }) {
         <div style={{ width: "36px", height: "4px", background: T.borderGray,
           borderRadius: "2px", margin: "0 auto 1.2rem" }} />
         <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1.2rem",
-          color: T.accent }}>Mover tarea</h3>
+          color: T.text }}>Mover tarea</h3>
         <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
           style={{
             width: "100%", padding: ".8rem 1rem", background: T.bg,
-            border: `1.5px solid ${T.borderGray}`, borderRadius: "12px",
+            border: `1.5px solid ${T.borderGray}`, borderRadius: T.r3,
             color: T.text, fontSize: "1rem", outline: "none",
           }} />
         <div style={{ display: "flex", gap: ".75rem", marginTop: "1rem" }}>
           <button onClick={onClose} style={{
             flex: 1, padding: ".85rem", background: T.bg, border: "none",
-            borderRadius: "12px", color: T.textSub, fontWeight: 600,
+            borderRadius: T.r3, color: T.textSub, fontWeight: 600,
             fontSize: ".95rem", cursor: "pointer",
           }}>Cancelar</button>
           <button onClick={() => { onMove(targetDate); onClose(); }} style={{
             flex: 2, padding: ".85rem", background: T.accentGrad, border: "none",
-            borderRadius: "12px", color: T.textOnAccent, fontWeight: 700,
+            borderRadius: T.r3, color: T.textOnAccent, fontWeight: 700,
             fontSize: ".95rem", cursor: "pointer",
-            boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
+            boxShadow: "0 4px 16px var(--accent-shadow)",
           }}>Mover</button>
         </div>
       </div>

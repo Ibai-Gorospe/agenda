@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { T } from "../theme";
 import { formatDateLabel } from "../helpers";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { Search } from "lucide-react";
 
 export default function SearchModal({ tasks, onSelectTask, onClose }) {
   const [query, setQuery] = useState("");
@@ -34,18 +35,19 @@ export default function SearchModal({ tasks, onSelectTask, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
-      zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center",
-      paddingTop: "15vh",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
+      zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center",
     }}>
       <div ref={modalRef} className="modal-sheet" onClick={e => e.stopPropagation()}
         role="dialog" aria-modal="true" aria-label="Buscar tareas"
         style={{
-          background: T.bgModal, borderRadius: "20px",
-          padding: "1.25rem", width: "100%", maxWidth: "440px",
-          boxShadow: T.shadowFloat, maxHeight: "60vh", display: "flex", flexDirection: "column",
-          margin: "0 1rem",
+          background: T.bgModal, borderRadius: `${T.r6} ${T.r6} 0 0`,
+          padding: "1.5rem 1.5rem 2.5rem", width: "100%", maxWidth: "500px",
+          boxShadow: T.shadowFloat, maxHeight: "70vh", display: "flex", flexDirection: "column",
         }}>
+        <div style={{ width: "36px", height: "4px", background: T.borderGray,
+          borderRadius: "2px", margin: "0 auto 1.2rem" }} />
+
         <div style={{ position: "relative", marginBottom: ".75rem" }}>
           <input ref={inputRef} type="text" value={query}
             onChange={e => setQuery(e.target.value)}
@@ -54,12 +56,12 @@ export default function SearchModal({ tasks, onSelectTask, onClose }) {
             style={{
               width: "100%", padding: ".8rem 1rem .8rem 2.4rem",
               background: T.bg, border: `1.5px solid ${T.borderGray}`,
-              borderRadius: "12px", color: T.text, fontSize: "1rem", outline: "none",
+              borderRadius: T.r3, color: T.text, fontSize: "1rem", outline: "none",
             }} />
-          <span style={{
+          <Search size={16} style={{
             position: "absolute", left: ".85rem", top: "50%", transform: "translateY(-50%)",
-            color: T.textMuted, fontSize: ".9rem", pointerEvents: "none",
-          }}>{"\uD83D\uDD0D"}</span>
+            color: T.textMuted, pointerEvents: "none",
+          }} />
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
           {query.trim() && results.length === 0 && (

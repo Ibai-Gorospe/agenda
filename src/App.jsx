@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } fro
 import { supabase } from "./supabase";
 import { T, GLOBAL_CSS } from "./theme";
 import { MONTHS_ES } from "./constants";
+import { Sun, Moon, BarChart3, Search, CalendarDays, CalendarRange, Calendar, LayoutGrid, Scale, ChevronLeft, ChevronRight, WifiOff, AlertTriangle, LogOut } from "lucide-react";
 import { todayStr, pad, getWeekStart, formatWeekRange, nextRecurrenceDate, genId, formatDateLabel, dateAdd } from "./helpers";
 import { fetchTasks, upsertTask, deleteTaskDB, batchUpsertPositions } from "./api/tasks";
 import { supportsNotif, scheduleNotification } from "./api/notifications";
@@ -76,7 +77,7 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
     localStorage.setItem("agenda-dark", darkMode);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", darkMode ? "#121110" : "#f5f0e8");
+    if (meta) meta.setAttribute("content", darkMode ? "#080A10" : "#F1F3F9");
   }, [darkMode]);
 
   // Inject global CSS once
@@ -421,7 +422,7 @@ export default function App() {
       justifyContent: "center", background: T.bgPage, gap: "1rem" }}>
       <img src="/icon-192.png" alt="Agenda" style={{
         width: "48px", height: "48px", borderRadius: "14px",
-        boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))" }} />
+        boxShadow: `0 4px 16px var(--accent-shadow)` }} />
       <div style={{ width: "24px", height: "24px", border: `3px solid ${T.borderGray}`,
         borderTopColor: T.accent, borderRadius: "50%", animation: "spin .6s linear infinite" }} />
     </div>
@@ -434,11 +435,11 @@ export default function App() {
   const nextMonth = () => calMonth === 11 ? (setCalMonth(0), setCalYear(y => y + 1)) : setCalMonth(m => m + 1);
 
   const navItems = [
-    { key: "day", icon: "\uD83D\uDCC5", label: "Hoy" },
-    { key: "week", icon: "\uD83D\uDCC6", label: "Semana" },
-    { key: "month", icon: "\uD83D\uDDD3", label: "Mes" },
-    { key: "year", icon: "\uD83D\uDCCA", label: "Año" },
-    { key: "weight", icon: "\u2696\uFE0F", label: "Peso" },
+    { key: "day", icon: CalendarDays, label: "Hoy" },
+    { key: "week", icon: CalendarRange, label: "Semana" },
+    { key: "month", icon: Calendar, label: "Mes" },
+    { key: "year", icon: LayoutGrid, label: "Año" },
+    { key: "weight", icon: Scale, label: "Peso" },
   ];
 
   const activeIdx = navItems.findIndex(n => n.key === activeView);
@@ -457,12 +458,12 @@ export default function App() {
         borderBottom: `1px solid ${T.borderGray}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         position: "sticky", top: 0, zIndex: 20,
-        boxShadow: "0 1px 8px rgba(0,0,0,.05)",
+        boxShadow: T.shadow,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
           <img src="/icon-192.png" alt="Agenda" style={{
-            width: "36px", height: "36px", borderRadius: "10px",
-            boxShadow: "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))",
+            width: "36px", height: "36px", borderRadius: T.r3,
+            boxShadow: `0 2px 8px var(--accent-shadow)`,
           }} />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
@@ -479,17 +480,20 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: ".4rem" }}>
           <button onClick={() => setDarkMode(d => !d)} aria-label={darkMode ? "Modo claro" : "Modo oscuro"} style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".88rem",
-          }}>{darkMode ? "\u2600\uFE0F" : "\uD83C\uDF19"}</button>
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.textSub, padding: ".4rem", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>{darkMode ? <Sun size={16} /> : <Moon size={16} />}</button>
           <button onClick={() => setStatsOpen(true)} aria-label="Estadísticas" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".82rem",
-          }}>📊</button>
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.textSub, padding: ".4rem", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}><BarChart3 size={16} /></button>
           <button onClick={() => setSearchOpen(true)} aria-label="Buscar tareas" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".88rem",
-          }}>{"\uD83D\uDD0D"}</button>
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.textSub, padding: ".4rem", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}><Search size={16} /></button>
           {isGuest && (
             <button onClick={() => { setUser(null); setTasks({}); }} style={{
               background: T.accentLight, border: "none", borderRadius: "8px",
@@ -511,10 +515,10 @@ export default function App() {
       {/* Offline banner */}
       {!isOnline && (
         <div style={{
-          background: T.dangerBg, borderBottom: `1px solid rgba(224,82,82,.2)`,
+          background: T.dangerBg, borderBottom: `1px solid ${T.danger}20`,
           padding: ".55rem 1.25rem", display: "flex", alignItems: "center", gap: ".5rem",
         }}>
-          <span style={{ fontSize: ".82rem" }}>!</span>
+          <WifiOff size={14} style={{ color: T.dangerText, flexShrink: 0 }} />
           <p style={{ color: T.dangerText, fontSize: ".78rem", margin: 0 }}>
             Sin conexión — los cambios se guardarán automáticamente cuando vuelvas a tener red.
           </p>
@@ -527,7 +531,7 @@ export default function App() {
           background: T.accentLight, borderBottom: `1px solid ${T.border}`,
           padding: ".55rem 1.25rem", display: "flex", alignItems: "center", gap: ".5rem",
         }}>
-          <span style={{ fontSize: ".82rem" }}>{"\u26A0\uFE0F"}</span>
+          <AlertTriangle size={14} style={{ color: T.accentDark, flexShrink: 0 }} />
           <p style={{ color: T.accentDark, fontSize: ".78rem", margin: 0 }}>
             Sin cuenta — las tareas no se guardarán.{" "}
             <button onClick={() => { setUser(null); setTasks({}); }} style={{
@@ -547,20 +551,20 @@ export default function App() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           <button onClick={prevMonth} aria-label="Mes anterior" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.text, cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>{"\u2039"}</button>
+          }}><ChevronLeft size={18} /></button>
           <span style={{ fontWeight: 700, fontSize: "1rem", color: T.text }}>
             {activeView === "year" ? calYear : `${MONTHS_ES[calMonth]} ${calYear}`}
           </span>
           <button onClick={nextMonth} aria-label="Mes siguiente" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.text, cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>{"\u203A"}</button>
+          }}><ChevronRight size={18} /></button>
         </div>
       )}
 
@@ -575,11 +579,11 @@ export default function App() {
             const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() - 7);
             setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
           }} aria-label="Semana anterior" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.text, cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>{"\u2039"}</button>
+          }}><ChevronLeft size={18} /></button>
 
           <button onClick={() => setWeekStart(getWeekStart(todayStr()))} style={{
             background: weekStart === getWeekStart(todayStr()) ? T.accentLight : T.bg,
@@ -593,11 +597,11 @@ export default function App() {
             const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() + 7);
             setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
           }} aria-label="Semana siguiente" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.text, cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>{"\u203A"}</button>
+          }}><ChevronRight size={18} /></button>
         </div>
       )}
 
@@ -609,11 +613,11 @@ export default function App() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           <button onClick={() => setSelectedDate(prev => dateAdd(prev, -1))} aria-label="Día anterior" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.text, cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>{"\u2039"}</button>
+          }}><ChevronLeft size={18} /></button>
 
           <button onClick={() => setSelectedDate(today)} style={{
             background: selectedDate === today ? T.accentLight : T.bg,
@@ -624,11 +628,11 @@ export default function App() {
           }}>HOY</button>
 
           <button onClick={() => setSelectedDate(prev => dateAdd(prev, 1))} aria-label="Día siguiente" style={{
-            background: T.bg, border: "none", borderRadius: "8px",
-            color: T.text, fontSize: "1.1rem", cursor: "pointer",
+            background: T.bg, border: "none", borderRadius: T.r2,
+            color: T.text, cursor: "pointer",
             width: "34px", height: "34px", display: "flex",
             alignItems: "center", justifyContent: "center",
-          }}>{"\u203A"}</button>
+          }}><ChevronRight size={18} /></button>
         </div>
       )}
 
@@ -720,18 +724,18 @@ export default function App() {
         borderTop: `1px solid ${T.borderGray}`,
         paddingBottom: "env(safe-area-inset-bottom, 0)",
         position: "sticky", bottom: 0, zIndex: 20,
-        boxShadow: "0 -2px 16px rgba(0,0,0,.06)",
+        boxShadow: T.shadow,
       }} role="tablist" aria-label="Navegación principal">
         {/* Sliding indicator */}
         <div style={{
           position: "absolute", top: 0, height: "3px",
           width: `${100 / navItems.length}%`,
-          background: T.accentGrad, borderRadius: "0 0 3px 3px",
+          background: T.accentGrad, borderRadius: `0 0 ${T.r1} ${T.r1}`,
           transform: `translateX(${activeIdx * 100}%)`,
           transition: "transform .25s cubic-bezier(.32,1,.23,1)",
           left: 0,
         }} />
-        {navItems.map(({ key, icon, label }) => {
+        {navItems.map(({ key, icon: Icon, label }) => {
           const active = activeView === key;
           return (
             <button key={key} onClick={() => setActiveView(key)}
@@ -741,9 +745,10 @@ export default function App() {
                 cursor: "pointer", display: "flex", flexDirection: "column",
                 alignItems: "center", gap: ".2rem", position: "relative",
               }}>
-              <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>{icon}</span>
+              <Icon size={20} strokeWidth={active ? 2.2 : 1.8}
+                style={{ color: active ? T.accentDark : T.textMuted }} />
               <span style={{
-                fontSize: ".65rem", fontWeight: active ? 700 : 400,
+                fontSize: ".65rem", fontWeight: active ? 600 : 400,
                 color: active ? T.accentDark : T.textMuted,
                 letterSpacing: ".04em",
               }}>{label}</span>

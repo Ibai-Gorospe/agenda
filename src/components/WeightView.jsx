@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import { T } from "../theme";
+import { Scale, BarChart3, ChevronUp, ChevronDown, Check, X } from "lucide-react";
 import { pad, formatDateLabel } from "../helpers";
 import { fetchWeightLogs, upsertWeightLog, fetchWeightGoal, upsertWeightGoal } from "../api/weightLogs";
 import Badge from "./Badge";
@@ -54,21 +55,23 @@ function WeightView({ user, today, onCreateAccount }) {
     return (
       <div style={{ padding: "1.25rem 1rem 2rem", maxWidth: "600px", margin: "0 auto" }}>
         <div style={{
-          background: T.bgCard, borderRadius: "20px", padding: "2.5rem 1.5rem",
+          background: T.bgCard, borderRadius: T.r5, padding: "2.5rem 1.5rem",
           boxShadow: T.shadowCard, textAlign: "center",
         }}>
-          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⚖️</div>
-          <h3 style={{ color: T.text, fontSize: "1.15rem", fontWeight: 700, fontFamily: T.font, marginBottom: ".5rem" }}>
+          <div style={{ marginBottom: "1rem", display: "flex", justifyContent: "center" }}>
+            <Scale size={48} color={T.accent} strokeWidth={1.5} />
+          </div>
+          <h3 style={{ color: T.text, fontSize: "1.15rem", fontWeight: 700, marginBottom: ".5rem" }}>
             Seguimiento de peso
           </h3>
           <p style={{ color: T.textMuted, fontSize: ".88rem", lineHeight: 1.5, marginBottom: "1.2rem" }}>
             Necesitas una cuenta para guardar tus registros de peso y ver tu progreso.
           </p>
           <button onClick={onCreateAccount} style={{
-            background: T.accentGrad, border: "none", borderRadius: "12px",
+            background: T.accentGrad, border: "none", borderRadius: T.r3,
             color: T.textOnAccent, padding: ".75rem 1.5rem", fontWeight: 700,
             fontSize: ".9rem", cursor: "pointer",
-            boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
+            boxShadow: "0 4px 16px var(--accent-shadow)",
           }}>Crear cuenta</button>
         </div>
       </div>
@@ -123,24 +126,24 @@ function WeightView({ user, today, onCreateAccount }) {
     <div style={{ padding: "1.25rem 1rem 2rem", maxWidth: "600px", margin: "0 auto" }}>
       {/* Today's weight */}
       <div style={{
-        background: T.accentGrad, borderRadius: "20px", padding: "1.5rem",
-        marginBottom: "1rem", boxShadow: "0 4px 20px var(--accent-shadow, rgba(240,180,41,.3))",
+        background: T.accentGrad, borderRadius: T.r5, padding: "1.5rem",
+        marginBottom: "1rem", boxShadow: "0 4px 20px var(--accent-shadow)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: ".8rem" }}>
           <div>
             <span style={{
               display: "inline-block", background: "rgba(255,255,255,.3)",
-              color: "#fff", fontSize: ".72rem", fontWeight: 700,
-              padding: "2px 10px", borderRadius: "20px", letterSpacing: ".06em",
+              color: T.textOnAccent, fontSize: ".72rem", fontWeight: 700,
+              padding: "2px 10px", borderRadius: T.r5, letterSpacing: ".06em",
             }}>PESO DE HOY</span>
             <h2 style={{
-              color: "#fff", fontSize: "1.1rem", fontWeight: 700,
-              fontFamily: T.font, margin: ".3rem 0 0", textTransform: "capitalize",
+              color: T.textOnAccent, fontSize: "1.1rem", fontWeight: 700,
+              margin: ".3rem 0 0", textTransform: "capitalize",
             }}>{formatDateLabel(today)}</h2>
           </div>
           {hasExisting && (
-            <div style={{ color: "rgba(255,255,255,.8)", fontSize: ".78rem", fontWeight: 500 }}>
-              Registrado ✓
+            <div style={{ color: "rgba(255,255,255,.8)", fontSize: ".78rem", fontWeight: 500, display: "flex", alignItems: "center", gap: ".3rem" }}>
+              Registrado <Check size={14} strokeWidth={2.5} />
             </div>
           )}
         </div>
@@ -152,14 +155,14 @@ function WeightView({ user, today, onCreateAccount }) {
               style={{
                 width: "100%", padding: ".85rem 1rem",
                 background: "rgba(255,255,255,.95)", border: "none",
-                borderRadius: "14px", color: T.text, fontSize: "1.5rem",
-                fontWeight: 700, fontFamily: T.font, outline: "none", textAlign: "center",
+                borderRadius: T.r3, color: T.text, fontSize: "1.5rem",
+                fontWeight: 700, outline: "none", textAlign: "center",
               }} />
             <div style={{ color: "rgba(255,255,255,.7)", fontSize: ".75rem", textAlign: "center", marginTop: ".3rem" }}>kg</div>
           </div>
           <button onClick={saveWeight} disabled={saving || !todayWeight} style={{
             padding: ".85rem 1.5rem", background: "rgba(255,255,255,.95)",
-            border: "none", borderRadius: "14px", color: T.accentDark,
+            border: "none", borderRadius: T.r3, color: T.accentDark,
             fontWeight: 700, fontSize: ".95rem", flexShrink: 0,
             cursor: !todayWeight || saving ? "default" : "pointer",
             opacity: !todayWeight || saving ? .6 : 1, transition: "opacity .15s",
@@ -169,11 +172,13 @@ function WeightView({ user, today, onCreateAccount }) {
 
       {isEmpty ? (
         <div style={{
-          background: T.bgCard, borderRadius: "20px", padding: "2.5rem 1.5rem",
+          background: T.bgCard, borderRadius: T.r5, padding: "2.5rem 1.5rem",
           boxShadow: T.shadowCard, textAlign: "center",
         }}>
-          <div style={{ fontSize: "3rem", marginBottom: ".8rem" }}>📊</div>
-          <h3 style={{ color: T.text, fontSize: "1.1rem", fontWeight: 700, fontFamily: T.font, marginBottom: ".5rem" }}>
+          <div style={{ marginBottom: ".8rem", display: "flex", justifyContent: "center" }}>
+            <BarChart3 size={48} color={T.accent} strokeWidth={1.5} />
+          </div>
+          <h3 style={{ color: T.text, fontSize: "1.1rem", fontWeight: 700, marginBottom: ".5rem" }}>
             Empieza tu seguimiento
           </h3>
           <p style={{ color: T.textMuted, fontSize: ".88rem", lineHeight: 1.5 }}>
@@ -197,17 +202,17 @@ function WeightView({ user, today, onCreateAccount }) {
                   placeholder="Objetivo (kg)"
                   style={{
                     flex: 1, padding: ".5rem .75rem", background: T.bg,
-                    border: `1.5px solid ${T.borderGray}`, borderRadius: "10px",
+                    border: `1.5px solid ${T.borderGray}`, borderRadius: T.r3,
                     color: T.text, fontSize: ".9rem", outline: "none",
                   }} />
                 <button onClick={saveGoal} style={{
-                  background: T.accentGrad, border: "none", borderRadius: "10px",
-                  color: "#fff", padding: ".5rem .75rem", fontWeight: 700, fontSize: ".82rem", cursor: "pointer",
+                  background: T.accentGrad, border: "none", borderRadius: T.r3,
+                  color: T.textOnAccent, padding: ".5rem .75rem", fontWeight: 700, fontSize: ".82rem", cursor: "pointer",
                 }}>OK</button>
                 <button onClick={() => setShowGoalInput(false)} style={{
-                  background: T.bg, border: "none", borderRadius: "10px",
+                  background: T.bg, border: "none", borderRadius: T.r3,
                   color: T.textMuted, padding: ".5rem .6rem", cursor: "pointer", fontSize: ".82rem",
-                }}>✕</button>
+                }}><X size={14} /></button>
               </div>
             ) : (
               <>
@@ -219,7 +224,7 @@ function WeightView({ user, today, onCreateAccount }) {
                 </div>
                 <button onClick={() => { setShowGoalInput(true); setGoalInput(goalWeight ? String(goalWeight) : ""); }} style={{
                   background: T.bg, border: `1.5px solid ${T.borderGray}`,
-                  borderRadius: "10px", color: T.textSub, padding: ".4rem .75rem",
+                  borderRadius: T.r3, color: T.textSub, padding: ".4rem .75rem",
                   cursor: "pointer", fontSize: ".78rem", fontWeight: 600,
                 }}>{goalWeight ? "Cambiar" : "Definir"}</button>
               </>
@@ -257,15 +262,15 @@ function WeightView({ user, today, onCreateAccount }) {
             <span style={{ fontSize: ".88rem", fontWeight: 700, color: T.accentDark }}>
               {showDailyLog ? "Ocultar registro" : "Ver registro diario"}
             </span>
-            <span style={{ fontSize: ".75rem", color: T.accentDark }}>
-              {showDailyLog ? "\u25B2" : "\u25BC"}
+            <span style={{ color: T.accentDark, display: "flex", alignItems: "center" }}>
+              {showDailyLog ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </span>
           </button>
 
           {/* Daily log list */}
           {showDailyLog && (
             <div style={{
-              background: T.bgCard, borderRadius: "20px", padding: "1rem 1.2rem",
+              background: T.bgCard, borderRadius: T.r5, padding: "1rem 1.2rem",
               boxShadow: T.shadowCard, marginTop: ".75rem",
             }}>
               <h4 style={{ fontSize: ".85rem", fontWeight: 700, color: T.text, marginBottom: ".7rem" }}>
@@ -286,20 +291,20 @@ function WeightView({ user, today, onCreateAccount }) {
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: ".6rem .5rem",
                       background: isToday ? T.accentLight : "transparent",
-                      borderRadius: isToday ? "12px" : "0",
+                      borderRadius: isToday ? T.r3 : "0",
                       borderBottom: i < logs.length - 1 && !isToday ? `1px solid ${T.borderGray}` : "none",
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: ".6rem" }}>
                         <div style={{
-                          width: "38px", height: "38px", borderRadius: "10px",
+                          width: "38px", height: "38px", borderRadius: T.r3,
                           background: isToday ? T.accentGrad : T.bgCardWarm,
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                           flexShrink: 0,
                         }}>
-                          <span style={{ fontSize: ".62rem", fontWeight: 600, color: isToday ? "#fff" : T.textMuted, lineHeight: 1, textTransform: "uppercase" }}>
+                          <span style={{ fontSize: ".62rem", fontWeight: 600, color: isToday ? T.textOnAccent : T.textMuted, lineHeight: 1, textTransform: "uppercase" }}>
                             {dayName}
                           </span>
-                          <span style={{ fontSize: ".88rem", fontWeight: 700, color: isToday ? "#fff" : T.text, lineHeight: 1.15 }}>
+                          <span style={{ fontSize: ".88rem", fontWeight: 700, color: isToday ? T.textOnAccent : T.text, lineHeight: 1.15 }}>
                             {dayNum}
                           </span>
                         </div>
@@ -399,7 +404,7 @@ function WeightChart({ logs, goalWeight, today }) {
 
   return (
     <div style={{
-      background: T.bgCard, borderRadius: "20px", padding: "1.2rem 1rem .8rem",
+      background: T.bgCard, borderRadius: T.r5, padding: "1.2rem 1rem .8rem",
       boxShadow: T.shadowCard, marginBottom: "1rem",
     }}>
       <h4 style={{ fontSize: ".85rem", fontWeight: 700, color: T.text, marginBottom: ".6rem", paddingLeft: ".3rem" }}>

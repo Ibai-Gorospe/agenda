@@ -5,6 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { T } from "../theme";
 import { getCat, CATEGORIES, getPriorityColor, GYM_ID } from "../constants";
 import { todayStr, formatDateLabel, isWeekend, getRecurrenceLabel } from "../helpers";
+import { GripVertical, Check, Copy, CalendarPlus, Pencil, Trash2, Dumbbell, Plus, Sparkles, Sun, SearchX, Repeat, Paperclip, Clock } from "lucide-react";
 import Badge from "./Badge";
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
@@ -46,8 +47,8 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
           background: task.done ? T.doneBg : T.bgCard,
           border: `1.5px solid ${isDragging ? T.accent : T.borderGray}`,
           borderLeft: priorityColor ? `3px solid ${priorityColor}` : `1.5px solid ${isDragging ? T.accent : T.borderGray}`,
-          borderRadius: "16px", padding: ".85rem 1rem",
-          boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,.15)" : (task.done ? "none" : T.shadowCard),
+          borderRadius: T.r4, padding: ".85rem 1rem",
+          boxShadow: isDragging ? T.shadowFloat : (task.done ? "none" : T.shadowCard),
           position: "relative",
         }}>
         {/* Top row: drag handle + checkbox + text */}
@@ -58,21 +59,21 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
               width: "24px", minHeight: "36px", flexShrink: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "grab", touchAction: "none", color: T.textMuted,
-              fontSize: "1rem", userSelect: "none",
-            }}>⋮⋮</div>
+              userSelect: "none",
+            }}><GripVertical size={16} /></div>
           ) : (
             <div style={{ width: "24px", minHeight: "36px", flexShrink: 0 }} />
           )}
 
           {/* Checkbox */}
           <button onClick={() => onToggle(date, task.id)} aria-label={task.done ? "Marcar como pendiente" : "Marcar como completada"} style={{
-            width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
+            width: "32px", height: "32px", borderRadius: T.r3, flexShrink: 0,
             border: `2.5px solid ${task.done ? T.accent : T.borderGray}`,
             background: task.done ? T.accentGrad : "transparent",
             cursor: "pointer", display: "flex", alignItems: "center",
             justifyContent: "center", transition: "all .15s",
           }}>
-            {task.done && <span className="check-pop" style={{ color: "#fff", fontSize: ".8rem", fontWeight: 800 }}>✓</span>}
+            {task.done && <span className="check-pop"><Check size={16} color="#fff" strokeWidth={3} /></span>}
           </button>
 
           {/* Text */}
@@ -126,7 +127,9 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
             {task.recurrence && (
               <Badge color={task.done ? T.textMuted : (weekend ? T.weekend : T.accentDark)}
                 bg={task.done ? T.doneBg : (weekend ? T.weekendLight : T.accentLight)}>
-                {"🔄 "}{getRecurrenceLabel(task.recurrence)}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: ".25rem" }}>
+                  <Repeat size={10} /> {getRecurrenceLabel(task.recurrence)}
+                </span>
               </Badge>
             )}
             {task.priority && (
@@ -134,9 +137,9 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
                 {task.priority === "high" ? "Alta" : task.priority === "medium" ? "Media" : "Baja"}
               </Badge>
             )}
-            {task.notes && <span style={{ fontSize: ".75rem" }} title="Tiene notas">📎</span>}
+            {task.notes && <Paperclip size={13} style={{ color: T.textMuted, flexShrink: 0 }} />}
             {task.time && (<>
-              <span style={{ fontSize: ".75rem" }}>🕐</span>
+              <Clock size={13} style={{ color: T.textMuted, flexShrink: 0 }} />
               <span style={{
                 color: task.done ? T.textMuted : (weekend ? T.weekend : T.accent),
                 fontSize: ".8rem", fontWeight: 600,
@@ -154,24 +157,24 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
           <div style={{ display: "flex", gap: ".15rem", flexShrink: 0 }}>
             <button onClick={() => onDuplicate(date, task)} aria-label="Duplicar tarea" style={{
               width: "30px", height: "30px", background: T.bg, border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".85rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>📋</button>
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><Copy size={14} /></button>
             <button onClick={() => onMoveTask(date, task)} aria-label="Mover tarea" style={{
               width: "30px", height: "30px", background: T.bg, border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>📅</button>
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><CalendarPlus size={14} /></button>
             <button onClick={() => onEdit(date, task)} aria-label="Editar tarea" style={{
               width: "30px", height: "30px", background: T.bg, border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>✏️</button>
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><Pencil size={14} /></button>
             <button onClick={() => onDelete(date, task.id)} aria-label="Eliminar tarea" style={{
               width: "30px", height: "30px", background: T.bg, border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>🗑</button>
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><Trash2 size={14} /></button>
           </div>
         </div>
       </div>
@@ -215,8 +218,8 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
           background: task.done ? T.doneBg : T.gymBg,
           border: `1.5px solid ${isDragging ? T.gym : T.gymBorder}`,
           borderLeft: `4px solid ${task.done ? T.textMuted : T.gym}`,
-          borderRadius: "16px", padding: ".85rem 1rem",
-          boxShadow: isDragging ? "0 8px 24px rgba(139,92,246,.2)" : (task.done ? "none" : T.gymShadow),
+          borderRadius: T.r4, padding: ".85rem 1rem",
+          boxShadow: isDragging ? T.shadowFloat : (task.done ? "none" : T.gymShadow),
           position: "relative",
         }}>
         {/* Top row: drag handle + checkbox + text */}
@@ -227,28 +230,28 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
               width: "24px", minHeight: "36px", flexShrink: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "grab", touchAction: "none", color: T.textMuted,
-              fontSize: "1rem", userSelect: "none",
-            }}>⋮⋮</div>
+              userSelect: "none",
+            }}><GripVertical size={16} /></div>
           ) : (
             <div style={{ width: "24px", minHeight: "36px", flexShrink: 0 }} />
           )}
 
           {/* Purple checkbox */}
           <button onClick={() => onToggle(date, task.id)} aria-label={task.done ? "Marcar como pendiente" : "Marcar como completado"} style={{
-            width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
+            width: "32px", height: "32px", borderRadius: T.r3, flexShrink: 0,
             border: `2.5px solid ${task.done ? T.gym : T.gymBorder}`,
             background: task.done ? T.gymGrad : "transparent",
             cursor: "pointer", display: "flex", alignItems: "center",
             justifyContent: "center", transition: "all .15s",
           }}>
-            {task.done && <span className="check-pop" style={{ color: "#fff", fontSize: ".8rem", fontWeight: 800 }}>✓</span>}
+            {task.done && <span className="check-pop"><Check size={16} color="#fff" strokeWidth={3} /></span>}
           </button>
 
           {/* Text + exercise progress */}
           <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
             onClick={() => onToggle(date, task.id)}>
             <div style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
-              <span style={{ fontSize: ".85rem", flexShrink: 0 }}>💪</span>
+              <Dumbbell size={15} style={{ color: task.done ? T.textMuted : T.gym, flexShrink: 0 }} />
               <p style={{
                 color: task.done ? T.textMuted : T.text,
                 textDecoration: task.done ? "line-through" : "none",
@@ -260,7 +263,7 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
             {exercisesTotal > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: ".4rem", marginTop: ".3rem" }}>
                 <div style={{
-                  flex: 1, height: "4px", background: "rgba(139,92,246,.1)", borderRadius: "2px", maxWidth: "120px",
+                  flex: 1, height: "4px", background: T.gymBorder, borderRadius: "2px", maxWidth: "120px",
                 }}>
                   <div style={{
                     height: "100%", borderRadius: "2px",
@@ -283,12 +286,12 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
                 display: "flex", alignItems: "center", gap: ".4rem", padding: ".12rem 0",
               }}>
                 <span style={{
-                  width: "14px", height: "14px", borderRadius: "4px", flexShrink: 0,
-                  border: `1.5px solid ${ex.done ? T.gym : "rgba(139,92,246,.25)"}`,
+                  width: "14px", height: "14px", borderRadius: T.r1, flexShrink: 0,
+                  border: `1.5px solid ${ex.done ? T.gym : T.gymBorder}`,
                   background: ex.done ? T.gymGrad : "transparent",
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  {ex.done && <span style={{ color: "#fff", fontSize: ".45rem", fontWeight: 800 }}>✓</span>}
+                  {ex.done && <Check size={8} color="#fff" strokeWidth={3} />}
                 </span>
                 <span style={{
                   fontSize: ".78rem",
@@ -312,8 +315,10 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: ".4rem", flexWrap: "wrap", flex: 1, minWidth: 0 }}>
             {task.recurrence && (
-              <Badge color={task.done ? T.textMuted : T.gymDark} bg={task.done ? T.doneBg : "rgba(139,92,246,.08)"}>
-                {"🔄 "}{getRecurrenceLabel(task.recurrence)}
+              <Badge color={task.done ? T.textMuted : T.gymDark} bg={task.done ? T.doneBg : T.gymBorder}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: ".25rem" }}>
+                  <Repeat size={10} /> {getRecurrenceLabel(task.recurrence)}
+                </span>
               </Badge>
             )}
             {task.priority && (
@@ -321,16 +326,16 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
                 {task.priority === "high" ? "Alta" : task.priority === "medium" ? "Media" : "Baja"}
               </Badge>
             )}
-            {task.notes && <span style={{ fontSize: ".75rem" }} title="Tiene notas">📎</span>}
+            {task.notes && <Paperclip size={13} style={{ color: T.textMuted, flexShrink: 0 }} />}
             {task.time && (<>
-              <span style={{ fontSize: ".75rem" }}>🕐</span>
+              <Clock size={13} style={{ color: T.textMuted, flexShrink: 0 }} />
               <span style={{
                 color: task.done ? T.textMuted : T.gym,
                 fontSize: ".8rem", fontWeight: 600,
               }}>{task.time}</span>
             </>)}
             {task.time && task.reminder && task.reminder !== "0" && (
-              <Badge color={T.gymDark} bg="rgba(139,92,246,.08)">
+              <Badge color={T.gymDark} bg={T.gymBorder}>
                 {task.reminder >= 60 ? `${task.reminder / 60}h antes` : `${task.reminder}min antes`}
               </Badge>
             )}
@@ -339,25 +344,25 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
           {/* Action buttons */}
           <div style={{ display: "flex", gap: ".15rem", flexShrink: 0 }}>
             <button onClick={() => onDuplicate(date, task)} aria-label="Duplicar" style={{
-              width: "30px", height: "30px", background: "rgba(139,92,246,.06)", border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".85rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>📋</button>
+              width: "30px", height: "30px", background: T.gymLight, border: "none",
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><Copy size={14} /></button>
             <button onClick={() => onMoveTask(date, task)} aria-label="Mover" style={{
-              width: "30px", height: "30px", background: "rgba(139,92,246,.06)", border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>📅</button>
+              width: "30px", height: "30px", background: T.gymLight, border: "none",
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><CalendarPlus size={14} /></button>
             <button onClick={() => onEdit(date, task)} aria-label="Editar" style={{
-              width: "30px", height: "30px", background: "rgba(139,92,246,.06)", border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>✏️</button>
+              width: "30px", height: "30px", background: T.gymLight, border: "none",
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><Pencil size={14} /></button>
             <button onClick={() => onDelete(date, task.id)} aria-label="Eliminar" style={{
-              width: "30px", height: "30px", background: "rgba(139,92,246,.06)", border: "none",
-              borderRadius: "8px", color: T.textMuted, cursor: "pointer",
-              fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>🗑</button>
+              width: "30px", height: "30px", background: T.gymLight, border: "none",
+              borderRadius: T.r2, color: T.textMuted, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}><Trash2 size={14} /></button>
           </div>
         </div>
       </div>
@@ -483,34 +488,32 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
         background: weekend
           ? "var(--weekend-grad)"
           : T.accentGrad,
-        borderRadius: "20px", padding: "1.25rem 1.5rem",
+        borderRadius: T.r5, padding: "1.25rem 1.5rem",
         marginBottom: "1.25rem",
-        boxShadow: weekend
-          ? "0 4px 20px rgba(224,123,84,.3)"
-          : "0 4px 20px var(--accent-shadow, rgba(240,180,41,.3))",
+        boxShadow: `0 4px 20px var(--accent-shadow)`,
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             {isToday && (
               <span style={{
                 display: "inline-block", background: "rgba(255,255,255,.3)",
-                color: "#fff", fontSize: ".72rem", fontWeight: 700,
-                padding: "2px 10px", borderRadius: "20px", marginBottom: ".4rem",
+                color: T.textOnAccent, fontSize: ".72rem", fontWeight: 700,
+                padding: "2px 10px", borderRadius: T.r5, marginBottom: ".4rem",
                 letterSpacing: ".06em",
               }}>HOY</span>
             )}
             {weekend && !isToday && (
               <span style={{
                 display: "inline-block", background: "rgba(255,255,255,.25)",
-                color: "#fff", fontSize: ".72rem", fontWeight: 700,
-                padding: "2px 10px", borderRadius: "20px", marginBottom: ".4rem",
+                color: T.textOnAccent, fontSize: ".72rem", fontWeight: 700,
+                padding: "2px 10px", borderRadius: T.r5, marginBottom: ".4rem",
                 letterSpacing: ".06em",
               }}>FIN DE SEMANA</span>
             )}
             <h2 style={{
-              color: "#fff", fontSize: "1.35rem", fontWeight: 700,
+              color: T.textOnAccent, fontSize: "1.35rem", fontWeight: 700,
               textTransform: "capitalize", lineHeight: 1.2,
-              fontFamily: T.font, margin: 0,
+              margin: 0,
             }}>{formatDateLabel(date)}</h2>
           </div>
           {allDayTasks.length > 0 && (
@@ -527,7 +530,7 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
         <div className="task-card" style={{
           background: T.accentLight,
           border: `1.5px solid ${T.border}`,
-          borderRadius: "14px",
+          borderRadius: T.r3,
           padding: ".85rem 1rem",
           marginBottom: "1rem",
         }}>
@@ -537,18 +540,18 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
           <div style={{ display: "flex", gap: ".4rem" }}>
             <button onClick={onMovePendingToToday} style={{
               flex: 1, padding: ".55rem .6rem", background: T.accentGrad,
-              border: "none", borderRadius: "10px", color: T.textOnAccent,
+              border: "none", borderRadius: T.r3, color: T.textOnAccent,
               fontWeight: 600, fontSize: ".8rem", cursor: "pointer",
-              boxShadow: "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))",
+              boxShadow: `0 2px 8px var(--accent-shadow)`,
             }}>Mover todas</button>
             <button onClick={onSelectPending} style={{
               flex: 1, padding: ".55rem .6rem", background: T.bgCard,
-              border: `1.5px solid ${T.border}`, borderRadius: "10px",
+              border: `1.5px solid ${T.border}`, borderRadius: T.r3,
               color: T.accentDark, fontWeight: 600, fontSize: ".8rem", cursor: "pointer",
             }}>Seleccionar</button>
             <button onClick={onDismissPending} style={{
               padding: ".55rem .6rem", background: T.bg,
-              border: `1.5px solid ${T.borderGray}`, borderRadius: "10px",
+              border: `1.5px solid ${T.borderGray}`, borderRadius: T.r3,
               color: T.textMuted, fontWeight: 600, fontSize: ".8rem", cursor: "pointer",
             }}>Ignorar</button>
           </div>
@@ -567,7 +570,7 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
             cursor: "pointer", flexShrink: 0,
             background: sortByPriority ? T.accent : "transparent",
             border: `1.5px solid ${sortByPriority ? T.accent : T.borderGray}`,
-            color: sortByPriority ? "#fff" : T.textMuted,
+            color: sortByPriority ? T.textOnAccent : T.textMuted,
             display: "flex", alignItems: "center", gap: ".25rem",
           }}>
             <span style={{ fontSize: ".7rem" }}>↕</span> Prioridad
@@ -582,7 +585,7 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
                 cursor: "pointer", flexShrink: 0,
                 background: !activeCategory ? T.accent : "transparent",
                 border: `1.5px solid ${!activeCategory ? T.accent : T.borderGray}`,
-                color: !activeCategory ? "#fff" : T.textMuted,
+                color: !activeCategory ? T.textOnAccent : T.textMuted,
               }}>Todas</button>
               {CATEGORIES.filter(c => uniqueCategories.includes(c.id)).map(c => (
                 <button key={c.id} onClick={() => onSetActiveCategory(activeCategory === c.id ? null : c.id)} style={{
@@ -590,8 +593,8 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
                   cursor: "pointer", flexShrink: 0,
                   background: activeCategory === c.id ? c.color : "transparent",
                   border: `1.5px solid ${activeCategory === c.id ? c.color : T.borderGray}`,
-                  color: activeCategory === c.id ? "#fff" : T.textMuted,
-                }}>{c.id === GYM_ID ? "💪 " + c.label : c.label}</button>
+                  color: activeCategory === c.id ? T.textOnAccent : T.textMuted,
+                }}>{c.label}</button>
               ))}
             </>
           )}
@@ -604,15 +607,15 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
           {/* Workout section header */}
           <div style={{
             background: T.gymGrad,
-            borderRadius: "16px", padding: "1rem 1.2rem",
+            borderRadius: T.r4, padding: "1rem 1.2rem",
             marginBottom: ".65rem",
-            boxShadow: "0 4px 16px rgba(139,92,246,.25)",
+            boxShadow: T.gymShadow,
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: ".6rem" }}>
-              <span style={{ fontSize: "1.2rem" }}>💪</span>
+              <Dumbbell size={20} color="#fff" />
               <div>
-                <span style={{ color: "#fff", fontWeight: 700, fontSize: ".92rem", display: "block" }}>Entrenamiento</span>
+                <span style={{ color: T.textOnAccent, fontWeight: 700, fontSize: ".92rem", display: "block" }}>Entrenamiento</span>
                 {workoutExercisesTotal > 0 && (
                   <span style={{ color: "rgba(255,255,255,.7)", fontSize: ".72rem" }}>
                     {workoutExercisesDone}/{workoutExercisesTotal} ejercicios
@@ -625,11 +628,11 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
                 {workoutsDone}/{displayWorkout.length}
               </span>
               <button onClick={onAddWorkout} aria-label="Añadir entrenamiento" style={{
-                width: "28px", height: "28px", borderRadius: "8px",
+                width: "28px", height: "28px", borderRadius: T.r2,
                 background: "rgba(255,255,255,.2)", border: "none",
-                color: "#fff", fontSize: "1rem", cursor: "pointer",
+                color: T.textOnAccent, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
-              }}>+</button>
+              }}><Plus size={16} /></button>
             </div>
           </div>
 
@@ -669,11 +672,15 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
       {allDisplayRegular.length === 0 && allDisplayWorkout.length === 0 && (
         <div style={{
           textAlign: "center", padding: "3rem 1rem",
-          background: T.bgCard, borderRadius: "16px",
+          background: T.bgCard, borderRadius: T.r4,
           boxShadow: T.shadowCard, marginBottom: "1rem",
         }}>
-          <div style={{ fontSize: "2.5rem", marginBottom: ".6rem" }}>
-            {activeCategory ? "🔍" : weekend ? "☀️" : "✨"}
+          <div style={{ marginBottom: ".6rem", display: "flex", justifyContent: "center" }}>
+            {activeCategory
+              ? <SearchX size={40} style={{ color: T.textMuted }} />
+              : weekend
+                ? <Sun size={40} style={{ color: T.weekend }} />
+                : <Sparkles size={40} style={{ color: T.accent }} />}
           </div>
           <p style={{ color: T.textMuted, fontSize: ".9rem" }}>
             {activeCategory ? "Sin tareas en esta categoría" : weekend ? "Día libre, sin tareas" : "Sin tareas para este día"}
@@ -714,12 +721,12 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
         width: "100%", padding: "1rem",
         background: T.bgCard,
         border: `2px dashed ${weekend ? T.weekendBorder : T.border}`,
-        borderRadius: "16px",
+        borderRadius: T.r4,
         color: weekend ? T.weekend : T.accent,
         fontWeight: 600, fontSize: ".95rem", cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center", gap: ".5rem",
       }}>
-        <span style={{ fontSize: "1.1rem" }}>+</span> Añadir tarea
+        <Plus size={18} /> Añadir tarea
       </button>
     </div>
   );

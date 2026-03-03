@@ -10,7 +10,7 @@ export const T = {
   bgCardWarm: "var(--bg-card-warm)",
   bgModal: "var(--bg-modal)",
 
-  // Accent (golden yellow)
+  // Accent (indigo)
   accent: "var(--accent)",
   accentDark: "var(--accent-dark)",
   accentLight: "var(--accent-light)",
@@ -54,9 +54,9 @@ export const T = {
   gymBorder: "var(--gym-border)",
   gymShadow: "var(--gym-shadow)",
 
-  // Fonts (static — don't vary by theme)
-  font: "'Georgia', 'Times New Roman', serif",
-  fontSans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  // Fonts
+  font: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  fontSans: "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 
   // Spacing scale (static)
   sp1: "0.25rem",
@@ -79,114 +79,116 @@ export const T = {
 // ─── Global styles injected once ─────────────────────────────────────────────
 export const GLOBAL_CSS = `
   :root {
-    --bg: #faf7f0;
-    --bg-page: #f5f0e8;
-    --bg-card: #ffffff;
-    --bg-card-warm: #fffdf5;
-    --bg-modal: #ffffff;
+    --bg: #F8F9FC;
+    --bg-page: #F1F3F9;
+    --bg-card: #FFFFFF;
+    --bg-card-warm: #F8F9FF;
+    --bg-modal: #FFFFFF;
 
-    --accent: #f0b429;
-    --accent-dark: #d99a0d;
-    --accent-light: #fef3c7;
-    --accent-mid: #fde68a;
-    --accent-grad: linear-gradient(135deg, #f0b429 0%, #fbbf24 100%);
-    --accent-glow: rgba(240,180,41,.6);
-    --accent-shadow: rgba(240,180,41,.3);
+    --accent: #6366F1;
+    --accent-dark: #4F46E5;
+    --accent-light: #EEF2FF;
+    --accent-mid: #C7D2FE;
+    --accent-grad: linear-gradient(135deg, #6366F1 0%, #818CF8 100%);
+    --accent-glow: rgba(99,102,241,.5);
+    --accent-shadow: rgba(99,102,241,.25);
 
-    --weekend: #e07b54;
-    --weekend-light: #fff1ec;
-    --weekend-border: rgba(224,123,84,.25);
-    --weekend-grad: linear-gradient(135deg, #e07b54 0%, #f09060 100%);
+    --weekend: #F97316;
+    --weekend-light: #FFF7ED;
+    --weekend-border: rgba(249,115,22,.15);
+    --weekend-grad: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
 
-    --text: #1c1a14;
-    --text-sub: #6b6248;
-    --text-muted: #766f5e;
+    --text: #111827;
+    --text-sub: #6B7280;
+    --text-muted: #9CA3AF;
     --text-on-accent: #ffffff;
 
-    --border: rgba(240,180,41,.2);
-    --border-gray: rgba(0,0,0,.07);
-    --shadow: 0 2px 12px rgba(0,0,0,.07);
-    --shadow-card: 0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
-    --shadow-float: 0 8px 32px rgba(0,0,0,.12);
+    --border: rgba(99,102,241,.12);
+    --border-gray: rgba(0,0,0,.06);
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.03);
+    --shadow-float: 0 8px 30px rgba(0,0,0,.12);
 
-    --done: #a89b7a;
-    --done-bg: #faf7f0;
-    --danger: #e05252;
-    --success: #4aba6a;
-    --danger-bg: #fef2f2;
-    --success-bg: #f0fdf4;
-    --danger-text: #991b1b;
+    --done: #9CA3AF;
+    --done-bg: #F9FAFB;
+    --danger: #EF4444;
+    --success: #22C55E;
+    --danger-bg: #FEF2F2;
+    --success-bg: #F0FDF4;
+    --danger-text: #991B1B;
     --success-text: #166534;
 
-    --gym: #8b5cf6;
-    --gym-dark: #7c3aed;
-    --gym-light: #f5f3ff;
-    --gym-bg: #faf8ff;
-    --gym-grad: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
-    --gym-border: rgba(139,92,246,.12);
-    --gym-shadow: 0 2px 8px rgba(139,92,246,.08), 0 4px 16px rgba(0,0,0,.03);
+    --gym: #8B5CF6;
+    --gym-dark: #7C3AED;
+    --gym-light: #F5F3FF;
+    --gym-bg: #FAFAFF;
+    --gym-grad: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+    --gym-border: rgba(139,92,246,.10);
+    --gym-shadow: 0 1px 3px rgba(139,92,246,.06), 0 2px 8px rgba(0,0,0,.03);
 
-    --login-grad: linear-gradient(160deg, #fef9ec 0%, #fdf3d0 50%, #fef6e4 100%);
+    --login-grad: linear-gradient(160deg, #F0F1FE 0%, #E8EBFF 50%, #F5F6FF 100%);
   }
 
   [data-theme="dark"] {
-    --bg: #1a1917;
-    --bg-page: #121110;
-    --bg-card: #242320;
-    --bg-card-warm: #2a2825;
-    --bg-modal: #242320;
+    --bg: #0F1117;
+    --bg-page: #080A10;
+    --bg-card: #1A1D28;
+    --bg-card-warm: #1E2130;
+    --bg-modal: #1A1D28;
 
-    --accent: #f0b429;
-    --accent-dark: #fbbf24;
-    --accent-light: #3d3000;
-    --accent-mid: #5a4500;
-    --accent-grad: linear-gradient(135deg, #d99a0d 0%, #f0b429 100%);
-    --accent-glow: rgba(240,180,41,.4);
-    --accent-shadow: rgba(240,180,41,.2);
+    --accent: #818CF8;
+    --accent-dark: #A5B4FC;
+    --accent-light: #1E1B4B;
+    --accent-mid: #312E81;
+    --accent-grad: linear-gradient(135deg, #6366F1 0%, #818CF8 100%);
+    --accent-glow: rgba(129,140,248,.4);
+    --accent-shadow: rgba(99,102,241,.2);
 
-    --weekend: #e8845e;
-    --weekend-light: #2d1a10;
-    --weekend-border: rgba(224,123,84,.2);
-    --weekend-grad: linear-gradient(135deg, #c06840 0%, #e07b54 100%);
+    --weekend: #FB923C;
+    --weekend-light: #1C1008;
+    --weekend-border: rgba(251,146,60,.15);
+    --weekend-grad: linear-gradient(135deg, #EA580C 0%, #F97316 100%);
 
-    --text: #e8e4dc;
-    --text-sub: #a09880;
-    --text-muted: #8a8070;
+    --text: #E5E7EB;
+    --text-sub: #9CA3AF;
+    --text-muted: #6B7280;
     --text-on-accent: #ffffff;
 
-    --border: rgba(240,180,41,.15);
-    --border-gray: rgba(255,255,255,.08);
-    --shadow: 0 2px 12px rgba(0,0,0,.3);
-    --shadow-card: 0 1px 4px rgba(0,0,0,.2), 0 4px 16px rgba(0,0,0,.15);
-    --shadow-float: 0 8px 32px rgba(0,0,0,.4);
+    --border: rgba(99,102,241,.12);
+    --border-gray: rgba(255,255,255,.06);
+    --shadow: 0 1px 3px rgba(0,0,0,.2), 0 2px 8px rgba(0,0,0,.15);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.15), 0 2px 8px rgba(0,0,0,.12);
+    --shadow-float: 0 8px 30px rgba(0,0,0,.4);
 
-    --done: #7a7060;
-    --done-bg: #1a1917;
-    --danger: #ef5555;
-    --success: #4aba6a;
-    --danger-bg: #3d1515;
-    --success-bg: #0f2918;
-    --danger-text: #fca5a5;
-    --success-text: #86efac;
+    --done: #4B5563;
+    --done-bg: #111318;
+    --danger: #F87171;
+    --success: #4ADE80;
+    --danger-bg: #3B1111;
+    --success-bg: #0D2818;
+    --danger-text: #FCA5A5;
+    --success-text: #86EFAC;
 
-    --gym: #a78bfa;
-    --gym-dark: #8b5cf6;
-    --gym-light: #1f1a30;
-    --gym-bg: #1a1730;
-    --gym-grad: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
-    --gym-border: rgba(139,92,246,.2);
-    --gym-shadow: 0 2px 8px rgba(139,92,246,.15), 0 4px 16px rgba(0,0,0,.15);
+    --gym: #A78BFA;
+    --gym-dark: #8B5CF6;
+    --gym-light: #1A1530;
+    --gym-bg: #151228;
+    --gym-grad: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);
+    --gym-border: rgba(139,92,246,.15);
+    --gym-shadow: 0 1px 3px rgba(139,92,246,.12), 0 2px 8px rgba(0,0,0,.15);
 
-    --login-grad: linear-gradient(160deg, #1a1917 0%, #242320 50%, #1a1917 100%);
+    --login-grad: linear-gradient(160deg, #0F1117 0%, #1A1D28 50%, #0F1117 100%);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
   body {
     background: var(--bg-page);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color: var(--text);
     overscroll-behavior: none;
     transition: background-color .3s, color .3s;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   input, textarea, select, button { font-family: inherit; }
   input[type="time"]::-webkit-calendar-picker-indicator { opacity: 0.5; }

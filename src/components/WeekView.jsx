@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { T } from "../theme";
+import { Check } from "lucide-react";
 import { pad, isWeekend } from "../helpers";
 
 function WeekView({ startDate, tasks, onSelectDay, today }) {
@@ -27,9 +28,9 @@ function WeekView({ startDate, tasks, onSelectDay, today }) {
               : weekend ? T.weekendLight : T.bgCard,
             border: `1.5px solid ${isToday ? "transparent"
               : weekend ? T.weekendBorder : T.borderGray}`,
-            borderRadius: "16px", padding: ".9rem 1.1rem", cursor: "pointer",
+            borderRadius: T.r4, padding: ".9rem 1.1rem", cursor: "pointer",
             display: "flex", alignItems: "center", gap: ".9rem", textAlign: "left",
-            boxShadow: isToday ? "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))" : T.shadowCard,
+            boxShadow: isToday ? "0 4px 16px var(--accent-shadow)" : T.shadowCard,
           }}>
             <div style={{ flexShrink: 0, textAlign: "center", width: "44px" }}>
               <div style={{
@@ -38,8 +39,7 @@ function WeekView({ startDate, tasks, onSelectDay, today }) {
               }}>{dayName}</div>
               <div style={{
                 fontSize: "1.5rem", fontWeight: 700, lineHeight: 1,
-                color: isToday ? "#fff" : weekend ? T.weekend : T.text,
-                fontFamily: T.font,
+                color: isToday ? T.textOnAccent : weekend ? T.weekend : T.text,
               }}>{d}</div>
             </div>
 
@@ -79,11 +79,13 @@ function WeekView({ startDate, tasks, onSelectDay, today }) {
                 {pending > 0 && <div style={{
                   fontSize: ".75rem", fontWeight: 600,
                   color: isToday ? "rgba(255,255,255,.9)" : weekend ? T.weekend : T.accent,
-                }}>{pending} ⬤</div>}
+                  display: "flex", alignItems: "center", gap: ".25rem", justifyContent: "flex-end",
+                }}>{pending} <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor", display: "inline-block" }} /></div>}
                 {done > 0 && <div style={{
                   fontSize: ".72rem",
                   color: isToday ? "rgba(255,255,255,.5)" : T.textMuted,
-                }}>{done} ✓</div>}
+                  display: "flex", alignItems: "center", gap: ".2rem", justifyContent: "flex-end",
+                }}>{done} <Check size={12} strokeWidth={2.5} /></div>}
               </div>
             )}
           </button>
