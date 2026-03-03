@@ -29,3 +29,19 @@ export const getPriorityColor = (p) => PRIORITY_OPTIONS.find(o => o.value === p)
 export const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 export const MONTHS_SHORT = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 export const DAYS_ES = ["L","M","X","J","V","S","D"];
+
+// ─── Timing constants ────────────────────────────────────────────────────────
+export const TIMINGS = {
+  TOAST_DURATION: 4000,
+  TOAST_EXIT_ANIM: 250,
+  UNDO_WINDOW: 5000,
+  HIGHLIGHT_DURATION: 2000,
+};
+
+// ─── UI constants ────────────────────────────────────────────────────────────
+export const UI = {
+  MAX_TOASTS: 4,
+  SEARCH_RESULTS_LIMIT: 20,
+  SEARCH_DEBOUNCE: 300,
+  WORKOUT_EXERCISES_VISIBLE: 6,
+};

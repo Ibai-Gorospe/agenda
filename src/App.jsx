@@ -1,17 +1,19 @@
-import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
-import { supabase } from "./supabase";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { T, GLOBAL_CSS } from "./theme";
-import { MONTHS_ES } from "./constants";
-import { Sun, Moon, BarChart3, Search, CalendarDays, CalendarRange, Calendar, LayoutGrid, Scale, ChevronLeft, ChevronRight, WifiOff, AlertTriangle, LogOut } from "lucide-react";
-import { todayStr, pad, getWeekStart, formatWeekRange, nextRecurrenceDate, genId, formatDateLabel, dateAdd } from "./helpers";
-import { fetchTasks, upsertTask, deleteTaskDB, batchUpsertPositions } from "./api/tasks";
-import { supportsNotif, scheduleNotification } from "./api/notifications";
-import { useOfflineQueue } from "./hooks/useOfflineQueue";
-import { useSwipeNav } from "./hooks/useSwipeNav";
+import { MONTHS_ES, TIMINGS } from "./constants";
+import { Sun, Moon, BarChart3, Search, ChevronLeft, ChevronRight, WifiOff, AlertTriangle } from "lucide-react";
+import { todayStr, dateAdd } from "./helpers";
+import { useToast } from "./hooks/useToast";
+import { useTheme } from "./hooks/useTheme";
+import { useAuth } from "./hooks/useAuth";
+import { useNavigation } from "./hooks/useNavigation";
+import { useTaskManager } from "./hooks/useTaskManager";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
 import ToastContainer from "./components/ToastContainer";
 import LoginScreen from "./components/LoginScreen";
 import FloatingAddButton from "./components/FloatingAddButton";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const DayView = lazy(() => import("./components/DayView"));
 const WeekView = lazy(() => import("./components/WeekView"));
@@ -24,61 +26,47 @@ const MoveTaskPicker = lazy(() => import("./components/MoveTaskPicker"));
 const StatsView = lazy(() => import("./components/StatsView"));
 const PendingTasksSelector = lazy(() => import("./components/PendingTasksSelector"));
 
+const styles = {
+  headerIconBtn: {
+    background: T.bg, border: "none", borderRadius: T.r2,
+    color: T.textSub, padding: ".4rem", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  navArrowBtn: {
+    background: T.bg, border: "none", borderRadius: T.r2,
+    color: T.text, cursor: "pointer",
+    width: "34px", height: "34px", display: "flex",
+    alignItems: "center", justifyContent: "center",
+  },
+};
+
 export default function App() {
-  const [user, setUser] = useState(undefined);
-  const [tasks, setTasks] = useState({});
-  const [activeView, setActiveView] = useState(() => localStorage.getItem("agenda-activeView") || "day");
-  const [selectedDate, setSelectedDate] = useState(todayStr());
-  const [calMonth, setCalMonth] = useState(new Date().getMonth());
-  const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(todayStr()));
+  const { user, setUser, signOut, isGuest } = useAuth();
+  const {
+    today, activeView, setActiveView, selectedDate, setSelectedDate,
+    calMonth, setCalMonth, calYear, weekStart, setWeekStart,
+    prevMonth, nextMonth, prevWeek, nextWeek,
+    goToThisWeek, isThisWeek,
+    swipeHandlers, navItems,
+    formatWeekRange: weekRangeLabel,
+  } = useNavigation();
+  const { toasts, addToast, dismissToast } = useToast();
+  const { darkMode, toggleDarkMode } = useTheme();
+  const {
+    tasks, setTasks, syncing, tasksLoading, isOnline,
+    dismissedPendingBanner, setDismissedPendingBanner,
+    showPendingSelector, setShowPendingSelector,
+    persistTask, handleToggle, handleDelete, handleDuplicate,
+    moveTask, handleReorder,
+    pendingPastCount, pendingPastTasks,
+    moveAllPendingToToday, moveSelectedPendingToToday,
+  } = useTaskManager(user, addToast);
   const [modal, setModal] = useState(null);
   const [movePicker, setMovePicker] = useState(null);
-  const [dismissedPendingBanner, setDismissedPendingBanner] = useState(false);
-  const [toasts, setToasts] = useState([]);
-  const [syncing, setSyncing] = useState(false);
-  const [tasksLoading, setTasksLoading] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [searchOpen, setSearchOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
-  const [showPendingSelector, setShowPendingSelector] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem("agenda-dark");
-    if (saved !== null) return saved === "true";
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-  });
-  const undoRef = useRef(null);
-  const today = todayStr();
-  const { enqueue, flush } = useOfflineQueue();
-
-  // ── Toast system ──
-  const addToast = useCallback((message, type = "info", action = null, duration = 4000) => {
-    const id = genId();
-    setToasts(prev => [...prev.slice(-4), { id, message, type, action, exiting: false }]);
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
-        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 250);
-      }, duration);
-    }
-  }, []);
-  const dismissToast = useCallback((id) => {
-    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 250);
-  }, []);
-
-  // Persist active view
-  useEffect(() => { localStorage.setItem("agenda-activeView", activeView); }, [activeView]);
-
-  // Dark mode: apply to document + persist
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
-    localStorage.setItem("agenda-dark", darkMode);
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", darkMode ? "#080A10" : "#F1F3F9");
-  }, [darkMode]);
 
   // Inject global CSS once
   useEffect(() => {
@@ -88,324 +76,18 @@ export default function App() {
     return () => document.head.removeChild(style);
   }, []);
 
-  // Auth
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Load tasks
-  useEffect(() => {
-    if (user === undefined) return;
-    if (!user || user.guest) { setTasks({}); return; }
-    setTasksLoading(true);
-    fetchTasks(user.id)
-      .then(setTasks)
-      .catch(() => addToast("No se pudieron cargar las tareas. Revisa tu conexión.", "error"))
-      .finally(() => setTasksLoading(false));
-  }, [user, addToast]);
-
-  // Notifications
-  useEffect(() => {
-    if (supportsNotif && Notification.permission === "default") Notification.requestPermission();
-  }, []);
-
-  // Online/offline detection + flush queue
-  useEffect(() => {
-    const goOnline = async () => {
-      setIsOnline(true);
-      if (user && !user.guest) {
-        try {
-          await flush(user.id);
-          addToast("Conexión restaurada — cambios sincronizados", "success", null, 2500);
-        } catch {
-          addToast("Conexión restaurada", "success", null, 2500);
-        }
-      } else {
-        addToast("Conexión restaurada", "success", null, 2500);
-      }
-    };
-    const goOffline = () => { setIsOnline(false); };
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
-    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
-  }, [addToast, user, flush]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setSearchOpen(true); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "n" && !modal) { e.preventDefault(); setModal({ date: selectedDate }); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [modal, selectedDate]);
-
-  // Bug fix #2: flush pending deletes when page is hidden
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "hidden" && undoRef.current && user && !user.guest) {
-        const { task: t, timer } = undoRef.current;
-        clearTimeout(timer);
-        undoRef.current = null;
-        try { await deleteTaskDB(t.id); } catch { /* best effort */ }
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [user]);
+  useKeyboardShortcuts({
+    onSearch: () => setSearchOpen(true),
+    onNewTask: () => setModal({ date: selectedDate }),
+  });
 
   // Clear highlight after a delay
   useEffect(() => {
     if (highlightedTaskId) {
-      const timer = setTimeout(() => setHighlightedTaskId(null), 2000);
+      const timer = setTimeout(() => setHighlightedTaskId(null), TIMINGS.HIGHLIGHT_DURATION);
       return () => clearTimeout(timer);
     }
   }, [highlightedTaskId]);
-
-  // ── Sync wrapper (offline-aware) ──
-  const withSync = useCallback(async (fn, queueOp = null) => {
-    if (!isOnline && queueOp) {
-      enqueue(queueOp);
-      return;
-    }
-    setSyncing(true);
-    try { await fn(); }
-    catch (err) {
-      if (queueOp) enqueue(queueOp);
-      else addToast(err.message || "Error de sincronización", "error");
-    }
-    finally { setSyncing(false); }
-  }, [isOnline, addToast, enqueue]);
-
-  // Bug fix #3: compute savedTask inside setTasks updater to avoid stale closure
-  const persistTask = useCallback(async (date, task) => {
-    let savedTask;
-    setTasks(prev => {
-      const dayTasks = prev[date] || [];
-      const idx = dayTasks.findIndex(t => t.id === task.id);
-      savedTask = idx >= 0
-        ? { ...task, position: dayTasks[idx].position }
-        : { ...task, position: dayTasks.length };
-      const newDay = idx >= 0
-        ? dayTasks.map(t => t.id === task.id ? savedTask : t)
-        : [...dayTasks, savedTask];
-      return { ...prev, [date]: newDay };
-    });
-    if (user && !user.guest) {
-      await withSync(
-        async () => {
-          await upsertTask(user.id, date, savedTask);
-          scheduleNotification(savedTask, date);
-        },
-        { type: "upsert", date, task: savedTask }
-      );
-    }
-  }, [user, withSync]);
-
-  const handleToggle = useCallback(async (date, id) => {
-    let updatedTask, nextDate, nextTask;
-    setTasks(prev => {
-      const task = (prev[date] || []).find(t => t.id === id);
-      if (!task) return prev;
-      const nowDone = !task.done;
-      updatedTask = { ...task, done: nowDone };
-
-      if (nowDone && task.recurrence) {
-        nextDate = nextRecurrenceDate(date, task.recurrence);
-        if (nextDate) {
-          nextTask = { ...task, id: genId(), done: false, position: (prev[nextDate] || []).length };
-        }
-      }
-
-      const newState = { ...prev, [date]: (prev[date] || []).map(t => t.id === id ? updatedTask : t) };
-      if (nextDate && nextTask) {
-        newState[nextDate] = [...(newState[nextDate] || []), nextTask];
-      }
-      return newState;
-    });
-
-    if (user && !user.guest && updatedTask) {
-      await withSync(async () => {
-        await upsertTask(user.id, date, updatedTask);
-        if (nextDate && nextTask) {
-          await upsertTask(user.id, nextDate, nextTask);
-        }
-      });
-    }
-
-    if (updatedTask?.done && nextDate && nextTask) {
-      addToast(`Siguiente repetición creada para ${formatDateLabel(nextDate).split(",")[0]}`, "success", null, 3000);
-    }
-  }, [user, withSync, addToast]);
-
-  const handleDelete = useCallback(async (date, id) => {
-    const task = tasks[date]?.find(t => t.id === id);
-    if (!task) return;
-    setTasks(prev => ({ ...prev, [date]: (prev[date] || []).filter(t => t.id !== id) }));
-    if (undoRef.current) clearTimeout(undoRef.current.timer);
-    const undoData = { date, task, timer: null };
-    undoRef.current = undoData;
-    addToast("Tarea eliminada", "info", {
-      label: "Deshacer",
-      fn: () => {
-        if (undoRef.current === undoData) {
-          clearTimeout(undoData.timer);
-          undoRef.current = null;
-          setTasks(prev => {
-            const restored = [...(prev[date] || []), task].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-            return { ...prev, [date]: restored };
-          });
-          addToast("Tarea restaurada", "success", null, 2000);
-        }
-      }
-    }, 5000);
-    undoData.timer = setTimeout(async () => {
-      if (undoRef.current === undoData) {
-        undoRef.current = null;
-        if (user && !user.guest) {
-          try { await deleteTaskDB(id); }
-          catch { addToast("Error al eliminar en el servidor", "error"); }
-        }
-      }
-    }, 5000);
-  }, [tasks, user, addToast]);
-
-  const handleDuplicate = useCallback(async (date, task) => {
-    const newTask = {
-      ...task,
-      id: genId(),
-      done: false,
-      position: (tasks[date] || []).length,
-      subtasks: (task.subtasks || []).map(s => ({ ...s, id: genId(), done: false })),
-    };
-    await persistTask(date, newTask);
-    addToast("Tarea duplicada", "success", null, 2000);
-  }, [tasks, persistTask, addToast]);
-
-  const moveTask = useCallback(async (fromDate, toDate, taskId) => {
-    if (fromDate === toDate) return;
-    let movedTask;
-    setTasks(prev => {
-      const task = (prev[fromDate] || []).find(t => t.id === taskId);
-      if (!task) return prev;
-      const toLen = (prev[toDate] || []).length;
-      movedTask = { ...task, position: toLen };
-      const fromTasks = (prev[fromDate] || []).filter(t => t.id !== taskId);
-      const toTasks = [...(prev[toDate] || []), movedTask];
-      return { ...prev, [fromDate]: fromTasks, [toDate]: toTasks };
-    });
-    if (user && !user.guest) {
-      await withSync(async () => {
-        await supabase.from("tasks").update({ date: toDate, position: movedTask.position }).eq("id", taskId);
-      });
-    }
-  }, [user, withSync]);
-
-  const handleReorder = useCallback(async (date, reorderedTasks) => {
-    const withPositions = reorderedTasks.map((t, i) => ({ ...t, position: i }));
-    setTasks(prev => ({ ...prev, [date]: withPositions }));
-    if (user && !user.guest) {
-      await withSync(async () => {
-        await batchUpsertPositions(user.id, date, withPositions);
-      });
-    }
-  }, [user, withSync]);
-
-  const pendingPastCount = useMemo(() => {
-    if (selectedDate !== today) return 0;
-    let count = 0;
-    Object.entries(tasks).forEach(([date, dayTasks]) => {
-      if (date < today) count += dayTasks.filter(t => !t.done).length;
-    });
-    return count;
-  }, [tasks, selectedDate, today]);
-
-  const moveAllPendingToToday = useCallback(async () => {
-    const todayDate = todayStr();
-    const updates = [];
-    setTasks(prev => {
-      const newTasks = {};
-      let todayTasks = [...(prev[todayDate] || [])];
-      let position = todayTasks.length;
-      Object.entries(prev).forEach(([date, dayTasks]) => {
-        if (date >= todayDate) { newTasks[date] = dayTasks; return; }
-        const pending = dayTasks.filter(t => !t.done);
-        const remaining = dayTasks.filter(t => t.done);
-        pending.forEach(task => {
-          const movedTask = { ...task, position: position++ };
-          todayTasks.push(movedTask);
-          updates.push({ id: task.id, date: todayDate, position: movedTask.position });
-        });
-        newTasks[date] = remaining;
-      });
-      newTasks[todayDate] = todayTasks;
-      return newTasks;
-    });
-    setDismissedPendingBanner(true);
-    if (user && !user.guest) {
-      await withSync(async () => {
-        await Promise.all(
-          updates.map(u => supabase.from("tasks").update({ date: u.date, position: u.position }).eq("id", u.id))
-        );
-      });
-    }
-  }, [user, withSync]);
-
-  // Pending past tasks grouped by date (for selector modal)
-  const pendingPastTasks = useMemo(() => {
-    if (selectedDate !== today) return [];
-    const result = [];
-    Object.entries(tasks).forEach(([date, dayTasks]) => {
-      if (date < today) {
-        const pending = dayTasks.filter(t => !t.done);
-        if (pending.length > 0) result.push({ date, tasks: pending });
-      }
-    });
-    return result.sort((a, b) => b.date.localeCompare(a.date));
-  }, [tasks, selectedDate, today]);
-
-  const moveSelectedPendingToToday = useCallback(async (selectedIds) => {
-    const todayDate = todayStr();
-    const updates = [];
-    setTasks(prev => {
-      const newTasks = {};
-      let todayTasks = [...(prev[todayDate] || [])];
-      let position = todayTasks.length;
-      Object.entries(prev).forEach(([date, dayTasks]) => {
-        if (date >= todayDate) { newTasks[date] = dayTasks; return; }
-        const toMove = dayTasks.filter(t => selectedIds.has(t.id));
-        const remaining = dayTasks.filter(t => !selectedIds.has(t.id));
-        toMove.forEach(task => {
-          const movedTask = { ...task, position: position++ };
-          todayTasks.push(movedTask);
-          updates.push({ id: task.id, date: todayDate, position: movedTask.position });
-        });
-        newTasks[date] = remaining;
-      });
-      newTasks[todayDate] = todayTasks;
-      return newTasks;
-    });
-    setDismissedPendingBanner(true);
-    setShowPendingSelector(false);
-    if (user && !user.guest) {
-      await withSync(async () => {
-        await Promise.all(
-          updates.map(u => supabase.from("tasks").update({ date: u.date, position: u.position }).eq("id", u.id))
-        );
-      });
-    }
-    addToast(`${selectedIds.size} tarea${selectedIds.size > 1 ? "s" : ""} movida${selectedIds.size > 1 ? "s" : ""} a hoy`, "success", null, 3000);
-  }, [user, withSync, addToast]);
-
-  // Swipe navigation for day view
-  const swipeHandlers = useSwipeNav({
-    onSwipeLeft: () => activeView === "day" && setSelectedDate(prev => dateAdd(prev, 1)),
-    onSwipeRight: () => activeView === "day" && setSelectedDate(prev => dateAdd(prev, -1)),
-  });
 
   // PWA shortcut: ?action=new-task
   useEffect(() => {
@@ -429,18 +111,6 @@ export default function App() {
   );
 
   if (!user) return <LoginScreen onLogin={setUser} />;
-
-  const isGuest = user?.guest;
-  const prevMonth = () => calMonth === 0 ? (setCalMonth(11), setCalYear(y => y - 1)) : setCalMonth(m => m - 1);
-  const nextMonth = () => calMonth === 11 ? (setCalMonth(0), setCalYear(y => y + 1)) : setCalMonth(m => m + 1);
-
-  const navItems = [
-    { key: "day", icon: CalendarDays, label: "Hoy" },
-    { key: "week", icon: CalendarRange, label: "Semana" },
-    { key: "month", icon: Calendar, label: "Mes" },
-    { key: "year", icon: LayoutGrid, label: "Año" },
-    { key: "weight", icon: Scale, label: "Peso" },
-  ];
 
   const activeIdx = navItems.findIndex(n => n.key === activeView);
 
@@ -479,21 +149,12 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: "flex", gap: ".4rem" }}>
-          <button onClick={() => setDarkMode(d => !d)} aria-label={darkMode ? "Modo claro" : "Modo oscuro"} style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.textSub, padding: ".4rem", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>{darkMode ? <Sun size={16} /> : <Moon size={16} />}</button>
-          <button onClick={() => setStatsOpen(true)} aria-label="Estadísticas" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.textSub, padding: ".4rem", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}><BarChart3 size={16} /></button>
-          <button onClick={() => setSearchOpen(true)} aria-label="Buscar tareas" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.textSub, padding: ".4rem", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}><Search size={16} /></button>
+          <button onClick={toggleDarkMode} aria-label={darkMode ? "Modo claro" : "Modo oscuro"} style={styles.headerIconBtn}>
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}</button>
+          <button onClick={() => setStatsOpen(true)} aria-label="Estadísticas" style={styles.headerIconBtn}>
+            <BarChart3 size={16} /></button>
+          <button onClick={() => setSearchOpen(true)} aria-label="Buscar tareas" style={styles.headerIconBtn}>
+            <Search size={16} /></button>
           {isGuest && (
             <button onClick={() => { setUser(null); setTasks({}); }} style={{
               background: T.accentLight, border: "none", borderRadius: "8px",
@@ -502,8 +163,7 @@ export default function App() {
             }}>Crear cuenta</button>
           )}
           <button onClick={async () => {
-            if (!isGuest) await supabase.auth.signOut();
-            setUser(null); setTasks({});
+            await signOut(); setTasks({});
           }} aria-label="Cerrar sesión" style={{
             background: T.bg, border: `1px solid ${T.borderGray}`,
             borderRadius: "8px", color: T.textSub,
@@ -550,21 +210,13 @@ export default function App() {
           background: T.bgCard, borderBottom: `1px solid ${T.borderGray}`,
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <button onClick={prevMonth} aria-label="Mes anterior" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.text, cursor: "pointer",
-            width: "34px", height: "34px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}><ChevronLeft size={18} /></button>
+          <button onClick={prevMonth} aria-label="Mes anterior" style={styles.navArrowBtn}>
+            <ChevronLeft size={18} /></button>
           <span style={{ fontWeight: 700, fontSize: "1rem", color: T.text }}>
             {activeView === "year" ? calYear : `${MONTHS_ES[calMonth]} ${calYear}`}
           </span>
-          <button onClick={nextMonth} aria-label="Mes siguiente" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.text, cursor: "pointer",
-            width: "34px", height: "34px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}><ChevronRight size={18} /></button>
+          <button onClick={nextMonth} aria-label="Mes siguiente" style={styles.navArrowBtn}>
+            <ChevronRight size={18} /></button>
         </div>
       )}
 
@@ -575,33 +227,19 @@ export default function App() {
           background: T.bgCard, borderBottom: `1px solid ${T.borderGray}`,
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <button onClick={() => {
-            const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() - 7);
-            setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }} aria-label="Semana anterior" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.text, cursor: "pointer",
-            width: "34px", height: "34px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}><ChevronLeft size={18} /></button>
+          <button onClick={prevWeek} aria-label="Semana anterior" style={styles.navArrowBtn}>
+            <ChevronLeft size={18} /></button>
 
-          <button onClick={() => setWeekStart(getWeekStart(todayStr()))} style={{
-            background: weekStart === getWeekStart(todayStr()) ? T.accentLight : T.bg,
+          <button onClick={goToThisWeek} style={{
+            background: isThisWeek ? T.accentLight : T.bg,
             border: "none", borderRadius: "8px",
-            color: weekStart === getWeekStart(todayStr()) ? T.accentDark : T.textSub,
+            color: isThisWeek ? T.accentDark : T.textSub,
             fontSize: ".82rem", fontWeight: 700, padding: ".35rem .8rem",
             cursor: "pointer",
-          }}>{formatWeekRange(weekStart)}</button>
+          }}>{weekRangeLabel()}</button>
 
-          <button onClick={() => {
-            const d = new Date(weekStart + "T12:00:00"); d.setDate(d.getDate() + 7);
-            setWeekStart(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }} aria-label="Semana siguiente" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.text, cursor: "pointer",
-            width: "34px", height: "34px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}><ChevronRight size={18} /></button>
+          <button onClick={nextWeek} aria-label="Semana siguiente" style={styles.navArrowBtn}>
+            <ChevronRight size={18} /></button>
         </div>
       )}
 
@@ -612,12 +250,8 @@ export default function App() {
           background: T.bgCard, borderBottom: `1px solid ${T.borderGray}`,
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <button onClick={() => setSelectedDate(prev => dateAdd(prev, -1))} aria-label="Día anterior" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.text, cursor: "pointer",
-            width: "34px", height: "34px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}><ChevronLeft size={18} /></button>
+          <button onClick={() => setSelectedDate(prev => dateAdd(prev, -1))} aria-label="Día anterior" style={styles.navArrowBtn}>
+            <ChevronLeft size={18} /></button>
 
           <button onClick={() => setSelectedDate(today)} style={{
             background: selectedDate === today ? T.accentLight : T.bg,
@@ -627,18 +261,15 @@ export default function App() {
             cursor: "pointer", letterSpacing: ".06em",
           }}>HOY</button>
 
-          <button onClick={() => setSelectedDate(prev => dateAdd(prev, 1))} aria-label="Día siguiente" style={{
-            background: T.bg, border: "none", borderRadius: T.r2,
-            color: T.text, cursor: "pointer",
-            width: "34px", height: "34px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}><ChevronRight size={18} /></button>
+          <button onClick={() => setSelectedDate(prev => dateAdd(prev, 1))} aria-label="Día siguiente" style={styles.navArrowBtn}>
+            <ChevronRight size={18} /></button>
         </div>
       )}
 
       {/* Main content */}
       <div style={{ flex: 1, overflowY: "auto" }}
         {...(activeView === "day" ? swipeHandlers : {})}>
+        <ErrorBoundary>
         <Suspense fallback={
           <div style={{ padding: "1.25rem 1rem", maxWidth: "600px", margin: "0 auto" }}>
             {[1, 2, 3].map(i => (
@@ -710,6 +341,7 @@ export default function App() {
               onCreateAccount={() => { setUser(null); setTasks({}); }} />
           )}
         </Suspense>
+        </ErrorBoundary>
       </div>
 
       {/* Floating add button (visible on non-day views) */}
@@ -758,6 +390,7 @@ export default function App() {
       </nav>
 
       {/* Modals */}
+      <ErrorBoundary>
       <Suspense fallback={null}>
         {modal && (
           <TaskModal date={modal.date} task={modal.task}
@@ -790,6 +423,7 @@ export default function App() {
             onClose={() => setShowPendingSelector(false)} />
         )}
       </Suspense>
+      </ErrorBoundary>
 
       {/* Toasts */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

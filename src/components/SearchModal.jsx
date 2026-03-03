@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { T } from "../theme";
 import { formatDateLabel } from "../helpers";
+import { UI } from "../constants";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { Search } from "lucide-react";
 
 export default function SearchModal({ tasks, onSelectTask, onClose }) {
-  const [query, setQuery] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const inputRef = useRef(null);
   const modalRef = useRef(null);
 
@@ -18,20 +20,36 @@ export default function SearchModal({ tasks, onSelectTask, onClose }) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase().trim();
-    const matches = [];
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(inputValue), UI.SEARCH_DEBOUNCE);
+    return () => clearTimeout(timer);
+  }, [inputValue]);
+
+  // Pre-computed flat index with lowercased text
+  const searchIndex = useMemo(() => {
+    const index = [];
     Object.entries(tasks).forEach(([date, dayTasks]) => {
       dayTasks.forEach(task => {
-        if (task.text.toLowerCase().includes(q)) {
-          matches.push({ date, task });
-        }
+        index.push({ date, task, textLower: task.text.toLowerCase() });
       });
     });
-    matches.sort((a, b) => b.date.localeCompare(a.date));
-    return matches.slice(0, 20);
-  }, [query, tasks]);
+    index.sort((a, b) => b.date.localeCompare(a.date));
+    return index;
+  }, [tasks]);
+
+  const results = useMemo(() => {
+    const q = debouncedQuery.toLowerCase().trim();
+    if (!q) return [];
+    const matches = [];
+    for (const entry of searchIndex) {
+      if (entry.textLower.includes(q)) {
+        matches.push({ date: entry.date, task: entry.task });
+        if (matches.length >= UI.SEARCH_RESULTS_LIMIT) break;
+      }
+    }
+    return matches;
+  }, [debouncedQuery, searchIndex]);
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{
@@ -49,8 +67,8 @@ export default function SearchModal({ tasks, onSelectTask, onClose }) {
           borderRadius: "2px", margin: "0 auto 1.2rem" }} />
 
         <div style={{ position: "relative", marginBottom: ".75rem" }}>
-          <input ref={inputRef} type="text" value={query}
-            onChange={e => setQuery(e.target.value)}
+          <input ref={inputRef} type="text" value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
             placeholder="Buscar tareas..."
             aria-label="Buscar tareas"
             style={{
@@ -64,9 +82,9 @@ export default function SearchModal({ tasks, onSelectTask, onClose }) {
           }} />
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
-          {query.trim() && results.length === 0 && (
+          {debouncedQuery.trim() && results.length === 0 && (
             <p style={{ color: T.textMuted, fontSize: ".88rem", textAlign: "center", padding: "1.5rem 0" }}>
-              Sin resultados para &quot;{query}&quot;
+              Sin resultados para &quot;{debouncedQuery}&quot;
             </p>
           )}
           {results.map(({ date, task }) => (
