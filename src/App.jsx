@@ -21,6 +21,7 @@ const SearchModal = lazy(() => import("./components/SearchModal"));
 const TaskModal = lazy(() => import("./components/TaskModal"));
 const MoveTaskPicker = lazy(() => import("./components/MoveTaskPicker"));
 const StatsView = lazy(() => import("./components/StatsView"));
+const PendingTasksSelector = lazy(() => import("./components/PendingTasksSelector"));
 
 export default function App() {
   const [user, setUser] = useState(undefined);
@@ -41,6 +42,7 @@ export default function App() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
+  const [showPendingSelector, setShowPendingSelector] = useState(false);
   const undoRef = useRef(null);
   const today = todayStr();
   const { enqueue, flush } = useOfflineQueue();
@@ -339,6 +341,52 @@ export default function App() {
     }
   }, [user, withSync]);
 
+  // Pending past tasks grouped by date (for selector modal)
+  const pendingPastTasks = useMemo(() => {
+    if (selectedDate !== today) return [];
+    const result = [];
+    Object.entries(tasks).forEach(([date, dayTasks]) => {
+      if (date < today) {
+        const pending = dayTasks.filter(t => !t.done);
+        if (pending.length > 0) result.push({ date, tasks: pending });
+      }
+    });
+    return result.sort((a, b) => b.date.localeCompare(a.date));
+  }, [tasks, selectedDate, today]);
+
+  const moveSelectedPendingToToday = useCallback(async (selectedIds) => {
+    const todayDate = todayStr();
+    const updates = [];
+    setTasks(prev => {
+      const newTasks = {};
+      let todayTasks = [...(prev[todayDate] || [])];
+      let position = todayTasks.length;
+      Object.entries(prev).forEach(([date, dayTasks]) => {
+        if (date >= todayDate) { newTasks[date] = dayTasks; return; }
+        const toMove = dayTasks.filter(t => selectedIds.has(t.id));
+        const remaining = dayTasks.filter(t => !selectedIds.has(t.id));
+        toMove.forEach(task => {
+          const movedTask = { ...task, position: position++ };
+          todayTasks.push(movedTask);
+          updates.push({ id: task.id, date: todayDate, position: movedTask.position });
+        });
+        newTasks[date] = remaining;
+      });
+      newTasks[todayDate] = todayTasks;
+      return newTasks;
+    });
+    setDismissedPendingBanner(true);
+    setShowPendingSelector(false);
+    if (user && !user.guest) {
+      await withSync(async () => {
+        await Promise.all(
+          updates.map(u => supabase.from("tasks").update({ date: u.date, position: u.position }).eq("id", u.id))
+        );
+      });
+    }
+    addToast(`${selectedIds.size} tarea${selectedIds.size > 1 ? "s" : ""} movida${selectedIds.size > 1 ? "s" : ""} a hoy`, "success", null, 3000);
+  }, [user, withSync, addToast]);
+
   // Swipe navigation for day view
   const swipeHandlers = useSwipeNav({
     onSwipeLeft: () => activeView === "day" && setSelectedDate(prev => dateAdd(prev, 1)),
@@ -614,6 +662,7 @@ export default function App() {
               pendingPastCount={pendingPastCount}
               onMovePendingToToday={moveAllPendingToToday}
               onDismissPending={() => setDismissedPendingBanner(true)}
+              onSelectPending={() => setShowPendingSelector(true)}
               showPendingBanner={selectedDate === today && !dismissedPendingBanner}
               activeCategory={activeCategory}
               onSetActiveCategory={setActiveCategory}
@@ -711,6 +760,12 @@ export default function App() {
         )}
         {statsOpen && (
           <StatsView tasks={tasks} today={today} onClose={() => setStatsOpen(false)} />
+        )}
+        {showPendingSelector && pendingPastTasks.length > 0 && (
+          <PendingTasksSelector
+            pendingGroups={pendingPastTasks}
+            onMove={moveSelectedPendingToToday}
+            onClose={() => setShowPendingSelector(false)} />
         )}
       </Suspense>
 

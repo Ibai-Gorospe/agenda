@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -7,10 +7,16 @@ import { getCat, CATEGORIES, getPriorityColor, GYM_ID } from "../constants";
 import { todayStr, formatDateLabel, isWeekend, getRecurrenceLabel } from "../helpers";
 import Badge from "./Badge";
 
+const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
+
 /* ━━━ Regular Task Card ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
-function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveTask, onDuplicate, highlightedTaskId }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveTask, onDuplicate, highlightedTaskId, hideDragHandle }) {
+  const canDrag = !task.done && !hideDragHandle;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    disabled: !canDrag,
+  });
   const cardRef = useRef(null);
   const isHighlighted = highlightedTaskId === task.id;
 
@@ -46,13 +52,17 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
         }}>
         {/* Top row: drag handle + checkbox + text */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: ".7rem" }}>
-          {/* Drag handle */}
-          <div {...listeners} style={{
-            width: "24px", minHeight: "36px", flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "grab", touchAction: "none", color: T.textMuted,
-            fontSize: "1rem", userSelect: "none",
-          }}>⋮⋮</div>
+          {/* Drag handle or spacer */}
+          {canDrag ? (
+            <div {...listeners} style={{
+              width: "24px", minHeight: "36px", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "grab", touchAction: "none", color: T.textMuted,
+              fontSize: "1rem", userSelect: "none",
+            }}>⋮⋮</div>
+          ) : (
+            <div style={{ width: "24px", minHeight: "36px", flexShrink: 0 }} />
+          )}
 
           {/* Checkbox */}
           <button onClick={() => onToggle(date, task.id)} aria-label={task.done ? "Marcar como pendiente" : "Marcar como completada"} style={{
@@ -171,8 +181,12 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
 
 /* ━━━ Workout Card ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
-function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTask, onDuplicate, highlightedTaskId }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTask, onDuplicate, highlightedTaskId, hideDragHandle }) {
+  const canDrag = !task.done && !hideDragHandle;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    disabled: !canDrag,
+  });
   const cardRef = useRef(null);
   const isHighlighted = highlightedTaskId === task.id;
 
@@ -207,13 +221,17 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
         }}>
         {/* Top row: drag handle + checkbox + text */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: ".7rem" }}>
-          {/* Drag handle */}
-          <div {...listeners} style={{
-            width: "24px", minHeight: "36px", flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "grab", touchAction: "none", color: T.textMuted,
-            fontSize: "1rem", userSelect: "none",
-          }}>⋮⋮</div>
+          {/* Drag handle or spacer */}
+          {canDrag ? (
+            <div {...listeners} style={{
+              width: "24px", minHeight: "36px", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "grab", touchAction: "none", color: T.textMuted,
+              fontSize: "1rem", userSelect: "none",
+            }}>⋮⋮</div>
+          ) : (
+            <div style={{ width: "24px", minHeight: "36px", flexShrink: 0 }} />
+          )}
 
           {/* Purple checkbox */}
           <button onClick={() => onToggle(date, task.id)} aria-label={task.done ? "Marcar como pendiente" : "Marcar como completado"} style={{
@@ -347,16 +365,51 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
   );
 }
 
+/* ━━━ Completed divider ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+function CompletedDivider({ count }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: ".5rem",
+      margin: ".85rem 0 .5rem", padding: "0 .25rem",
+    }}>
+      <div style={{ flex: 1, height: "1px", background: T.borderGray }} />
+      <span style={{
+        fontSize: ".7rem", fontWeight: 600, color: T.textMuted,
+        letterSpacing: ".05em", textTransform: "uppercase",
+      }}>
+        Completadas ({count})
+      </span>
+      <div style={{ flex: 1, height: "1px", background: T.borderGray }} />
+    </div>
+  );
+}
+
 /* ━━━ Day View ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDelete, onMoveTask, onReorder, onDuplicate,
-                   pendingPastCount, onMovePendingToToday, onDismissPending, showPendingBanner,
+                   pendingPastCount, onMovePendingToToday, onDismissPending, onSelectPending, showPendingBanner,
                    activeCategory, onSetActiveCategory, highlightedTaskId }) {
+
+  // Sort preference (persisted)
+  const [sortByPriority, setSortByPriority] = useState(() =>
+    localStorage.getItem("agenda-sortByPriority") === "true"
+  );
+  useEffect(() => {
+    localStorage.setItem("agenda-sortByPriority", String(sortByPriority));
+  }, [sortByPriority]);
+
   const allDayTasks = [...(tasks[date] || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
   // Separate workout and regular tasks
   const workoutTasks = allDayTasks.filter(t => t.category === GYM_ID);
   const regularTasks = allDayTasks.filter(t => t.category !== GYM_ID);
+
+  // Split into pending/done (unfiltered — used by DnD handlers)
+  const pendingWorkout = workoutTasks.filter(t => !t.done);
+  const doneWorkout = workoutTasks.filter(t => t.done);
+  const pendingRegular = regularTasks.filter(t => !t.done);
+  const doneRegular = regularTasks.filter(t => t.done);
 
   // Apply category filter
   const displayWorkout = activeCategory
@@ -366,10 +419,33 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
     ? (activeCategory === GYM_ID ? [] : regularTasks.filter(t => t.category === activeCategory))
     : regularTasks;
 
+  // Split filtered into pending/done (for display)
+  const displayPendingWorkout = displayWorkout.filter(t => !t.done);
+  const displayDoneWorkout = displayWorkout.filter(t => t.done);
+  const displayPendingRegular = displayRegular.filter(t => !t.done);
+  const displayDoneRegular = displayRegular.filter(t => t.done);
+
+  // Apply priority sorting when enabled
+  const sortByPriorityFn = (a, b) => {
+    const pa = PRIORITY_RANK[a.priority] ?? 3;
+    const pb = PRIORITY_RANK[b.priority] ?? 3;
+    return pa !== pb ? pa - pb : (a.position ?? 0) - (b.position ?? 0);
+  };
+  const sortedPendingWorkout = sortByPriority
+    ? [...displayPendingWorkout].sort(sortByPriorityFn)
+    : displayPendingWorkout;
+  const sortedPendingRegular = sortByPriority
+    ? [...displayPendingRegular].sort(sortByPriorityFn)
+    : displayPendingRegular;
+
+  // Combined arrays for SortableContext (pending first, done last)
+  const allDisplayWorkout = [...sortedPendingWorkout, ...displayDoneWorkout];
+  const allDisplayRegular = [...sortedPendingRegular, ...displayDoneRegular];
+
   const isToday = date === todayStr();
   const weekend = isWeekend(date);
-  const pending = allDayTasks.filter(t => !t.done).length;
-  const done = allDayTasks.filter(t => t.done).length;
+  const pendingCount = allDayTasks.filter(t => !t.done).length;
+  const doneCount = allDayTasks.filter(t => t.done).length;
 
   const uniqueCategories = [...new Set(allDayTasks.map(t => t.category).filter(Boolean))];
 
@@ -381,18 +457,18 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
 
   const handleWorkoutDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return;
-    const oldIdx = workoutTasks.findIndex(t => t.id === active.id);
-    const newIdx = workoutTasks.findIndex(t => t.id === over.id);
+    const oldIdx = pendingWorkout.findIndex(t => t.id === active.id);
+    const newIdx = pendingWorkout.findIndex(t => t.id === over.id);
     if (oldIdx === -1 || newIdx === -1) return;
-    onReorder(date, [...arrayMove(workoutTasks, oldIdx, newIdx), ...regularTasks]);
+    onReorder(date, [...arrayMove(pendingWorkout, oldIdx, newIdx), ...doneWorkout, ...pendingRegular, ...doneRegular]);
   };
 
   const handleRegularDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return;
-    const oldIdx = regularTasks.findIndex(t => t.id === active.id);
-    const newIdx = regularTasks.findIndex(t => t.id === over.id);
+    const oldIdx = pendingRegular.findIndex(t => t.id === active.id);
+    const newIdx = pendingRegular.findIndex(t => t.id === over.id);
     if (oldIdx === -1 || newIdx === -1) return;
-    onReorder(date, [...workoutTasks, ...arrayMove(regularTasks, oldIdx, newIdx)]);
+    onReorder(date, [...pendingWorkout, ...doneWorkout, ...arrayMove(pendingRegular, oldIdx, newIdx), ...doneRegular]);
   };
 
   // Workout section stats
@@ -439,8 +515,8 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
           </div>
           {allDayTasks.length > 0 && (
             <div style={{ textAlign: "right" }}>
-              {pending > 0 && <div style={{ color: "rgba(255,255,255,.9)", fontSize: ".82rem", fontWeight: 600 }}>{pending} pendiente{pending > 1 ? "s" : ""}</div>}
-              {done > 0 && <div style={{ color: "rgba(255,255,255,.65)", fontSize: ".78rem" }}>{done} completada{done > 1 ? "s" : ""}</div>}
+              {pendingCount > 0 && <div style={{ color: "rgba(255,255,255,.9)", fontSize: ".82rem", fontWeight: 600 }}>{pendingCount} pendiente{pendingCount > 1 ? "s" : ""}</div>}
+              {doneCount > 0 && <div style={{ color: "rgba(255,255,255,.65)", fontSize: ".78rem" }}>{doneCount} completada{doneCount > 1 ? "s" : ""}</div>}
             </div>
           )}
         </div>
@@ -458,49 +534,72 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
           <p style={{ color: T.textSub, fontSize: ".88rem", margin: "0 0 .6rem", lineHeight: 1.4 }}>
             Tienes <strong style={{ color: T.accentDark }}>{pendingPastCount}</strong> tarea{pendingPastCount > 1 ? "s" : ""} pendiente{pendingPastCount > 1 ? "s" : ""} de días anteriores
           </p>
-          <div style={{ display: "flex", gap: ".5rem" }}>
+          <div style={{ display: "flex", gap: ".4rem" }}>
             <button onClick={onMovePendingToToday} style={{
-              flex: 1, padding: ".55rem .8rem", background: T.accentGrad,
+              flex: 1, padding: ".55rem .6rem", background: T.accentGrad,
               border: "none", borderRadius: "10px", color: T.textOnAccent,
-              fontWeight: 600, fontSize: ".82rem", cursor: "pointer",
+              fontWeight: 600, fontSize: ".8rem", cursor: "pointer",
               boxShadow: "0 2px 8px rgba(240,180,41,.3)",
-            }}>Mover a hoy</button>
+            }}>Mover todas</button>
+            <button onClick={onSelectPending} style={{
+              flex: 1, padding: ".55rem .6rem", background: T.bgCard,
+              border: `1.5px solid ${T.border}`, borderRadius: "10px",
+              color: T.accentDark, fontWeight: 600, fontSize: ".8rem", cursor: "pointer",
+            }}>Seleccionar</button>
             <button onClick={onDismissPending} style={{
-              flex: 1, padding: ".55rem .8rem", background: T.bg,
+              padding: ".55rem .6rem", background: T.bg,
               border: `1.5px solid ${T.borderGray}`, borderRadius: "10px",
-              color: T.textSub, fontWeight: 600, fontSize: ".82rem", cursor: "pointer",
+              color: T.textMuted, fontWeight: 600, fontSize: ".8rem", cursor: "pointer",
             }}>Ignorar</button>
           </div>
         </div>
       )}
 
-      {/* Category filter */}
-      {uniqueCategories.length >= 2 && (
+      {/* Filter & sort bar */}
+      {allDayTasks.length > 0 && (
         <div style={{
           display: "flex", gap: ".35rem", marginBottom: "1rem",
-          overflowX: "auto", paddingBottom: ".2rem",
+          overflowX: "auto", paddingBottom: ".2rem", alignItems: "center",
         }}>
-          <button onClick={() => onSetActiveCategory(null)} style={{
+          {/* Priority sort toggle */}
+          <button onClick={() => setSortByPriority(p => !p)} style={{
             padding: ".3rem .7rem", borderRadius: "20px", fontSize: ".75rem", fontWeight: 600,
             cursor: "pointer", flexShrink: 0,
-            background: !activeCategory ? T.accent : "transparent",
-            border: `1.5px solid ${!activeCategory ? T.accent : T.borderGray}`,
-            color: !activeCategory ? "#fff" : T.textMuted,
-          }}>Todas</button>
-          {CATEGORIES.filter(c => uniqueCategories.includes(c.id)).map(c => (
-            <button key={c.id} onClick={() => onSetActiveCategory(activeCategory === c.id ? null : c.id)} style={{
-              padding: ".3rem .7rem", borderRadius: "20px", fontSize: ".75rem", fontWeight: 600,
-              cursor: "pointer", flexShrink: 0,
-              background: activeCategory === c.id ? c.color : "transparent",
-              border: `1.5px solid ${activeCategory === c.id ? c.color : T.borderGray}`,
-              color: activeCategory === c.id ? "#fff" : T.textMuted,
-            }}>{c.id === GYM_ID ? "💪 " + c.label : c.label}</button>
-          ))}
+            background: sortByPriority ? T.accent : "transparent",
+            border: `1.5px solid ${sortByPriority ? T.accent : T.borderGray}`,
+            color: sortByPriority ? "#fff" : T.textMuted,
+            display: "flex", alignItems: "center", gap: ".25rem",
+          }}>
+            <span style={{ fontSize: ".7rem" }}>↕</span> Prioridad
+          </button>
+
+          {/* Separator + category chips */}
+          {uniqueCategories.length >= 2 && (
+            <>
+              <div style={{ width: "1px", height: "20px", background: T.borderGray, flexShrink: 0, margin: "0 .1rem" }} />
+              <button onClick={() => onSetActiveCategory(null)} style={{
+                padding: ".3rem .7rem", borderRadius: "20px", fontSize: ".75rem", fontWeight: 600,
+                cursor: "pointer", flexShrink: 0,
+                background: !activeCategory ? T.accent : "transparent",
+                border: `1.5px solid ${!activeCategory ? T.accent : T.borderGray}`,
+                color: !activeCategory ? "#fff" : T.textMuted,
+              }}>Todas</button>
+              {CATEGORIES.filter(c => uniqueCategories.includes(c.id)).map(c => (
+                <button key={c.id} onClick={() => onSetActiveCategory(activeCategory === c.id ? null : c.id)} style={{
+                  padding: ".3rem .7rem", borderRadius: "20px", fontSize: ".75rem", fontWeight: 600,
+                  cursor: "pointer", flexShrink: 0,
+                  background: activeCategory === c.id ? c.color : "transparent",
+                  border: `1.5px solid ${activeCategory === c.id ? c.color : T.borderGray}`,
+                  color: activeCategory === c.id ? "#fff" : T.textMuted,
+                }}>{c.id === GYM_ID ? "💪 " + c.label : c.label}</button>
+              ))}
+            </>
+          )}
         </div>
       )}
 
       {/* ━━━ WORKOUT SECTION ━━━ */}
-      {displayWorkout.length > 0 && (
+      {allDisplayWorkout.length > 0 && (
         <div style={{ marginBottom: "1.25rem" }}>
           {/* Workout section header */}
           <div style={{
@@ -536,15 +635,29 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
 
           {/* Workout cards */}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleWorkoutDragEnd}>
-            <SortableContext items={displayWorkout.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext items={allDisplayWorkout.map(t => t.id)} strategy={verticalListSortingStrategy}>
               <div style={{ display: "flex", flexDirection: "column", gap: ".65rem" }}>
-                {displayWorkout.map(task => (
+                {sortedPendingWorkout.map(task => (
                   <SortableWorkoutTask key={task.id} task={task} date={date}
                     onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
                     onMoveTask={onMoveTask} onDuplicate={onDuplicate}
-                    highlightedTaskId={highlightedTaskId} />
+                    highlightedTaskId={highlightedTaskId}
+                    hideDragHandle={sortByPriority} />
                 ))}
               </div>
+              {displayDoneWorkout.length > 0 && (
+                <>
+                  <CompletedDivider count={displayDoneWorkout.length} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: ".65rem" }}>
+                    {displayDoneWorkout.map(task => (
+                      <SortableWorkoutTask key={task.id} task={task} date={date}
+                        onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                        onMoveTask={onMoveTask} onDuplicate={onDuplicate}
+                        highlightedTaskId={highlightedTaskId} />
+                    ))}
+                  </div>
+                </>
+              )}
             </SortableContext>
           </DndContext>
         </div>
@@ -553,7 +666,7 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
       {/* ━━━ REGULAR TASKS SECTION ━━━ */}
 
       {/* Empty state (only if both sections empty) */}
-      {displayRegular.length === 0 && displayWorkout.length === 0 && (
+      {allDisplayRegular.length === 0 && allDisplayWorkout.length === 0 && (
         <div style={{
           textAlign: "center", padding: "3rem 1rem",
           background: T.bgCard, borderRadius: "16px",
@@ -568,17 +681,31 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
         </div>
       )}
 
-      {/* Regular task list with dnd-kit */}
+      {/* Regular task list */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRegularDragEnd}>
-        <SortableContext items={displayRegular.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          <div style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: "1rem" }}>
-            {displayRegular.map(task => (
+        <SortableContext items={allDisplayRegular.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          <div style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: displayDoneRegular.length > 0 ? "0" : "1rem" }}>
+            {sortedPendingRegular.map(task => (
               <SortableTask key={task.id} task={task} date={date} weekend={weekend}
                 onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
                 onMoveTask={onMoveTask} onDuplicate={onDuplicate}
-                highlightedTaskId={highlightedTaskId} />
+                highlightedTaskId={highlightedTaskId}
+                hideDragHandle={sortByPriority} />
             ))}
           </div>
+          {displayDoneRegular.length > 0 && (
+            <>
+              <CompletedDivider count={displayDoneRegular.length} />
+              <div style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: "1rem" }}>
+                {displayDoneRegular.map(task => (
+                  <SortableTask key={task.id} task={task} date={date} weekend={weekend}
+                    onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                    onMoveTask={onMoveTask} onDuplicate={onDuplicate}
+                    highlightedTaskId={highlightedTaskId} />
+                ))}
+              </div>
+            </>
+          )}
         </SortableContext>
       </DndContext>
 
