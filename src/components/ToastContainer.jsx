@@ -9,7 +9,7 @@ export default function ToastContainer({ toasts, onDismiss }) {
     }}>
       {toasts.map(t => (
         <div key={t.id} className={t.exiting ? "toast-exit" : "toast-enter"} role="alert" style={{
-          background: t.type === "error" ? "#fef2f2" : t.type === "success" ? "#f0fdf4" : T.accentLight,
+          background: t.type === "error" ? T.dangerBg : t.type === "success" ? T.successBg : T.accentLight,
           border: `1.5px solid ${t.type === "error" ? "rgba(224,82,82,.25)" : t.type === "success" ? "rgba(74,186,106,.25)" : T.border}`,
           borderRadius: "14px", padding: ".7rem 1rem", maxWidth: "400px", width: "100%",
           boxShadow: "0 4px 20px rgba(0,0,0,.12)", pointerEvents: "auto",
@@ -20,7 +20,7 @@ export default function ToastContainer({ toasts, onDismiss }) {
           </span>
           <span style={{
             flex: 1, fontSize: ".84rem", lineHeight: 1.3,
-            color: t.type === "error" ? "#991b1b" : t.type === "success" ? "#166534" : T.textSub,
+            color: t.type === "error" ? T.dangerText : t.type === "success" ? T.successText : T.textSub,
           }}>{t.message}</span>
           {t.action && (
             <button onClick={t.action.fn} style={{

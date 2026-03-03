@@ -47,7 +47,7 @@ function MonthView({ year, month, tasks, onSelectDay, today }) {
                 fontSize: ".88rem", aspectRatio: "1",
                 display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", gap: "2px",
-                boxShadow: isToday ? "0 2px 8px rgba(240,180,41,.4)" : "none",
+                boxShadow: isToday ? "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))" : "none",
               }}>
               {d}
               {dayTasks.length > 0 && (

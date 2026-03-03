@@ -32,7 +32,7 @@ function YearView({ year, tasks, onSelectMonth, today }) {
             border: `1.5px solid ${isCurrent ? "transparent" : T.borderGray}`,
             borderRadius: "16px", padding: "1rem .75rem", cursor: "pointer",
             textAlign: "center",
-            boxShadow: isCurrent ? "0 4px 16px rgba(240,180,41,.3)" : T.shadowCard,
+            boxShadow: isCurrent ? "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))" : T.shadowCard,
             opacity: isPast && !isCurrent ? .65 : 1,
           }}>
             <div style={{

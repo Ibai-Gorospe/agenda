@@ -43,6 +43,11 @@ export default function App() {
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [showPendingSelector, setShowPendingSelector] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem("agenda-dark");
+    if (saved !== null) return saved === "true";
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  });
   const undoRef = useRef(null);
   const today = todayStr();
   const { enqueue, flush } = useOfflineQueue();
@@ -65,6 +70,14 @@ export default function App() {
 
   // Persist active view
   useEffect(() => { localStorage.setItem("agenda-activeView", activeView); }, [activeView]);
+
+  // Dark mode: apply to document + persist
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    localStorage.setItem("agenda-dark", darkMode);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", darkMode ? "#121110" : "#f5f0e8");
+  }, [darkMode]);
 
   // Inject global CSS once
   useEffect(() => {
@@ -408,7 +421,7 @@ export default function App() {
       justifyContent: "center", background: T.bgPage, gap: "1rem" }}>
       <img src="/icon-192.png" alt="Agenda" style={{
         width: "48px", height: "48px", borderRadius: "14px",
-        boxShadow: "0 4px 16px rgba(240,180,41,.4)" }} />
+        boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))" }} />
       <div style={{ width: "24px", height: "24px", border: `3px solid ${T.borderGray}`,
         borderTopColor: T.accent, borderRadius: "50%", animation: "spin .6s linear infinite" }} />
     </div>
@@ -449,7 +462,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
           <img src="/icon-192.png" alt="Agenda" style={{
             width: "36px", height: "36px", borderRadius: "10px",
-            boxShadow: "0 2px 8px rgba(240,180,41,.3)",
+            boxShadow: "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))",
           }} />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
@@ -465,6 +478,10 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: "flex", gap: ".4rem" }}>
+          <button onClick={() => setDarkMode(d => !d)} aria-label={darkMode ? "Modo claro" : "Modo oscuro"} style={{
+            background: T.bg, border: "none", borderRadius: "8px",
+            color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".88rem",
+          }}>{darkMode ? "\u2600\uFE0F" : "\uD83C\uDF19"}</button>
           <button onClick={() => setStatsOpen(true)} aria-label="Estadísticas" style={{
             background: T.bg, border: "none", borderRadius: "8px",
             color: T.textSub, padding: ".35rem .55rem", cursor: "pointer", fontSize: ".82rem",
@@ -494,11 +511,11 @@ export default function App() {
       {/* Offline banner */}
       {!isOnline && (
         <div style={{
-          background: "#fef2f2", borderBottom: `1px solid rgba(224,82,82,.2)`,
+          background: T.dangerBg, borderBottom: `1px solid rgba(224,82,82,.2)`,
           padding: ".55rem 1.25rem", display: "flex", alignItems: "center", gap: ".5rem",
         }}>
           <span style={{ fontSize: ".82rem" }}>!</span>
-          <p style={{ color: "#991b1b", fontSize: ".78rem", margin: 0 }}>
+          <p style={{ color: T.dangerText, fontSize: ".78rem", margin: 0 }}>
             Sin conexión — los cambios se guardarán automáticamente cuando vuelvas a tener red.
           </p>
         </div>
@@ -507,11 +524,11 @@ export default function App() {
       {/* Guest banner */}
       {isGuest && (
         <div style={{
-          background: "#fffbeb", borderBottom: `1px solid ${T.border}`,
+          background: T.accentLight, borderBottom: `1px solid ${T.border}`,
           padding: ".55rem 1.25rem", display: "flex", alignItems: "center", gap: ".5rem",
         }}>
           <span style={{ fontSize: ".82rem" }}>{"\u26A0\uFE0F"}</span>
-          <p style={{ color: "#92610a", fontSize: ".78rem", margin: 0 }}>
+          <p style={{ color: T.accentDark, fontSize: ".78rem", margin: 0 }}>
             Sin cuenta — las tareas no se guardarán.{" "}
             <button onClick={() => { setUser(null); setTasks({}); }} style={{
               background: "none", border: "none", color: T.accentDark,

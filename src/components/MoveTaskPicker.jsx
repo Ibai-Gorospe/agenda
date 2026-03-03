@@ -46,7 +46,7 @@ export default function MoveTaskPicker({ currentDate, onMove, onClose }) {
             flex: 2, padding: ".85rem", background: T.accentGrad, border: "none",
             borderRadius: "12px", color: T.textOnAccent, fontWeight: 700,
             fontSize: ".95rem", cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(240,180,41,.35)",
+            boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
           }}>Mover</button>
         </div>
       </div>

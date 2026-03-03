@@ -276,11 +276,11 @@ export default function TaskModal({ date, task, onSave, onClose }) {
           }}>Cancelar</button>
           <button onClick={save} style={{
             flex: 2, padding: ".85rem", background: weekend
-              ? `linear-gradient(135deg, ${T.weekend}, #f09060)`
+              ? "var(--weekend-grad)"
               : T.accentGrad,
             border: "none", borderRadius: "12px", color: T.textOnAccent,
             fontWeight: 700, fontSize: ".95rem", cursor: "pointer",
-            boxShadow: weekend ? "0 4px 16px rgba(224,123,84,.35)" : "0 4px 16px rgba(240,180,41,.35)",
+            boxShadow: weekend ? "0 4px 16px rgba(224,123,84,.35)" : "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
           }}>Guardar</button>
         </div>
       </div>

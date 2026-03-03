@@ -101,7 +101,7 @@ function SortableTask({ task, date, weekend, onToggle, onEdit, onDelete, onMoveT
                   <div style={{
                     height: "100%", borderRadius: "2px",
                     width: `${(subtasksDone / subtasksTotal) * 100}%`,
-                    background: subtasksDone === subtasksTotal ? "#4aba6a" : T.accent,
+                    background: subtasksDone === subtasksTotal ? T.success : T.accent,
                     transition: "width .2s",
                   }} />
                 </div>
@@ -265,7 +265,7 @@ function SortableWorkoutTask({ task, date, onToggle, onEdit, onDelete, onMoveTas
                   <div style={{
                     height: "100%", borderRadius: "2px",
                     width: `${(exercisesDone / exercisesTotal) * 100}%`,
-                    background: exercisesDone === exercisesTotal ? "#4aba6a" : T.gym,
+                    background: exercisesDone === exercisesTotal ? T.success : T.gym,
                     transition: "width .2s",
                   }} />
                 </div>
@@ -481,13 +481,13 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
       {/* Day header card */}
       <div style={{
         background: weekend
-          ? `linear-gradient(135deg, ${T.weekend} 0%, #f09060 100%)`
+          ? "var(--weekend-grad)"
           : T.accentGrad,
         borderRadius: "20px", padding: "1.25rem 1.5rem",
         marginBottom: "1.25rem",
         boxShadow: weekend
           ? "0 4px 20px rgba(224,123,84,.3)"
-          : "0 4px 20px rgba(240,180,41,.3)",
+          : "0 4px 20px var(--accent-shadow, rgba(240,180,41,.3))",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
@@ -539,7 +539,7 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
               flex: 1, padding: ".55rem .6rem", background: T.accentGrad,
               border: "none", borderRadius: "10px", color: T.textOnAccent,
               fontWeight: 600, fontSize: ".8rem", cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(240,180,41,.3)",
+              boxShadow: "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))",
             }}>Mover todas</button>
             <button onClick={onSelectPending} style={{
               flex: 1, padding: ".55rem .6rem", background: T.bgCard,

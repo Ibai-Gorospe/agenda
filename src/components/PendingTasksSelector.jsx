@@ -149,7 +149,7 @@ function PendingTasksSelector({ pendingGroups, onMove, onClose }) {
               color: selected.size > 0 ? T.textOnAccent : T.textMuted,
               fontWeight: 700, fontSize: ".92rem",
               cursor: selected.size > 0 ? "pointer" : "default",
-              boxShadow: selected.size > 0 ? "0 2px 8px rgba(240,180,41,.3)" : "none",
+              boxShadow: selected.size > 0 ? "0 2px 8px var(--accent-shadow, rgba(240,180,41,.3))" : "none",
               transition: "all .15s",
             }}>
             {selected.size > 0

@@ -102,7 +102,7 @@ export default function StatsView({ tasks, today, onClose }) {
           </div>
           <div style={{ flex: 1, background: T.bgCard, borderRadius: "16px", padding: ".9rem .7rem", boxShadow: T.shadowCard, textAlign: "center" }}>
             <div style={{ fontSize: ".7rem", color: T.textMuted, fontWeight: 600, letterSpacing: ".03em" }}>RACHA</div>
-            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: stats.completionStreak > 0 ? "#4aba6a" : T.textMuted }}>{stats.completionStreak}</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: stats.completionStreak > 0 ? T.success : T.textMuted }}>{stats.completionStreak}</div>
             <div style={{ fontSize: ".65rem", color: T.textMuted }}>días</div>
           </div>
         </div>

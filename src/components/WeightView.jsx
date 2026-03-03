@@ -68,7 +68,7 @@ function WeightView({ user, today, onCreateAccount }) {
             background: T.accentGrad, border: "none", borderRadius: "12px",
             color: T.textOnAccent, padding: ".75rem 1.5rem", fontWeight: 700,
             fontSize: ".9rem", cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(240,180,41,.35)",
+            boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
           }}>Crear cuenta</button>
         </div>
       </div>
@@ -124,7 +124,7 @@ function WeightView({ user, today, onCreateAccount }) {
       {/* Today's weight */}
       <div style={{
         background: T.accentGrad, borderRadius: "20px", padding: "1.5rem",
-        marginBottom: "1rem", boxShadow: "0 4px 20px rgba(240,180,41,.3)",
+        marginBottom: "1rem", boxShadow: "0 4px 20px var(--accent-shadow, rgba(240,180,41,.3))",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: ".8rem" }}>
           <div>
@@ -213,7 +213,7 @@ function WeightView({ user, today, onCreateAccount }) {
               <>
                 <div>
                   <span style={{ fontSize: ".78rem", fontWeight: 600, color: T.textSub }}>Objetivo: </span>
-                  <span style={{ fontSize: ".88rem", fontWeight: 700, color: goalWeight ? "#4aba6a" : T.textMuted }}>
+                  <span style={{ fontSize: ".88rem", fontWeight: 700, color: goalWeight ? T.success : T.textMuted }}>
                     {goalWeight ? `${goalWeight} kg` : "Sin definir"}
                   </span>
                 </div>
@@ -327,7 +327,7 @@ function WeightView({ user, today, onCreateAccount }) {
 }
 
 // Helpers
-const chgColor = (v) => v < -0.05 ? "#4aba6a" : v > 0.05 ? T.danger : T.textMuted;
+const chgColor = (v) => v < -0.05 ? T.success : v > 0.05 ? T.danger : T.textMuted;
 const chgArrow = (v) => v < -0.05 ? "↓" : v > 0.05 ? "↑" : "→";
 
 function StatCard({ label, value }) {
@@ -423,8 +423,8 @@ function WeightChart({ logs, goalWeight, today }) {
         {goalWeight && (
           <>
             <line x1={PL} y1={yOf(goalWeight)} x2={CW - PRt} y2={yOf(goalWeight)}
-              stroke="#4aba6a" strokeWidth="1.5" strokeDasharray="6,4" />
-            <text x={CW - PRt + 4} y={yOf(goalWeight) + 3} fill="#4aba6a" fontSize="9" fontFamily="sans-serif">
+              stroke="#4aba6a" strokeWidth="1.5" strokeDasharray="6,4" style={{ stroke: T.success }} />
+            <text x={CW - PRt + 4} y={yOf(goalWeight) + 3} fontSize="9" fontFamily="sans-serif" style={{ fill: T.success }}>
               Meta
             </text>
           </>
@@ -451,7 +451,7 @@ function WeightChart({ logs, goalWeight, today }) {
         </div>
         {goalWeight && (
           <div style={{ display: "flex", alignItems: "center", gap: ".35rem" }}>
-            <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#4aba6a" strokeWidth="1.5" strokeDasharray="4,3" /></svg>
+            <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" strokeWidth="1.5" strokeDasharray="4,3" style={{ stroke: T.success }} /></svg>
             <span style={{ fontSize: ".7rem", color: T.textMuted }}>Objetivo</span>
           </div>
         )}

@@ -29,7 +29,7 @@ function WeekView({ startDate, tasks, onSelectDay, today }) {
               : weekend ? T.weekendBorder : T.borderGray}`,
             borderRadius: "16px", padding: ".9rem 1.1rem", cursor: "pointer",
             display: "flex", alignItems: "center", gap: ".9rem", textAlign: "left",
-            boxShadow: isToday ? "0 4px 16px rgba(240,180,41,.3)" : T.shadowCard,
+            boxShadow: isToday ? "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))" : T.shadowCard,
           }}>
             <div style={{ flexShrink: 0, textAlign: "center", width: "44px" }}>
               <div style={{

@@ -48,7 +48,7 @@ export default function LoginScreen({ onLogin }) {
     <div style={{
       minHeight: "100dvh", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      background: `linear-gradient(160deg, #fef9ec 0%, #fdf3d0 50%, #fef6e4 100%)`,
+      background: "var(--login-grad)",
       padding: "2rem",
     }}>
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
@@ -56,7 +56,7 @@ export default function LoginScreen({ onLogin }) {
           width: "72px", height: "72px", borderRadius: "22px",
           background: T.accentGrad, display: "flex", alignItems: "center",
           justifyContent: "center", margin: "0 auto 1rem",
-          boxShadow: "0 8px 24px rgba(240,180,41,.35)",
+          boxShadow: "0 8px 24px var(--accent-shadow, rgba(240,180,41,.3))",
         }}>
           <span style={{ fontSize: "2rem" }}>📅</span>
         </div>
@@ -99,7 +99,7 @@ export default function LoginScreen({ onLogin }) {
                   width: "100%", padding: ".9rem", background: T.accentGrad,
                   border: "none", borderRadius: "12px", color: T.textOnAccent,
                   fontWeight: 700, fontSize: "1rem", cursor: "pointer",
-                  boxShadow: "0 4px 16px rgba(240,180,41,.4)",
+                  boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))",
                   opacity: loading ? .75 : 1,
                 }}>{loading ? "..." : "Enviar enlace"}</button>
                 <button type="button" onClick={() => { setMode("login"); setError(""); }} style={{
@@ -143,7 +143,7 @@ export default function LoginScreen({ onLogin }) {
                 width: "100%", padding: ".9rem", background: T.accentGrad,
                 border: "none", borderRadius: "12px", color: T.textOnAccent,
                 fontWeight: 700, fontSize: "1rem", cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(240,180,41,.4)", opacity: loading ? .75 : 1,
+                boxShadow: "0 4px 16px var(--accent-shadow, rgba(240,180,41,.3))", opacity: loading ? .75 : 1,
                 transition: "opacity .15s",
               }}>{loading ? "..." : mode === "login" ? "Entrar" : "Crear cuenta"}</button>
             </form>
