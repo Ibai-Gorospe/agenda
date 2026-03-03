@@ -24,6 +24,11 @@ export async function fetchWeightGoal(userId) {
   return data?.weight_goal_kg ? Number(data.weight_goal_kg) : null;
 }
 
+export async function deleteWeightLog(id) {
+  const { error } = await supabase.from("weight_logs").delete().eq("id", id);
+  if (error) throw new Error("Error al eliminar registro de peso");
+}
+
 export async function upsertWeightGoal(userId, goalKg) {
   const { error } = await supabase.from("user_settings").upsert(
     { user_id: userId, weight_goal_kg: goalKg },
