@@ -10,11 +10,12 @@ export async function fetchWeightLogs(userId) {
 }
 
 export async function upsertWeightLog(userId, date, weightKg) {
-  const { error } = await supabase.from("weight_logs").upsert(
+  const { data, error } = await supabase.from("weight_logs").upsert(
     { user_id: userId, date, weight_kg: weightKg },
     { onConflict: "user_id,date" }
-  );
+  ).select("id, date, weight_kg").single();
   if (error) throw new Error("Error al guardar peso");
+  return { id: data.id, date: data.date, weight_kg: Number(data.weight_kg) };
 }
 
 export async function fetchWeightGoal(userId) {

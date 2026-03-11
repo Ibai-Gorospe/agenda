@@ -1,5 +1,13 @@
 import { supabase } from "../supabase";
 
+const mapTaskRow = (t) => ({
+  id: t.id, text: t.text, time: t.time, reminder: t.reminder,
+  done: t.done, position: t.position ?? 0,
+  category: t.category || null, recurrence: t.recurrence || null,
+  priority: t.priority || null, notes: t.notes || null,
+  subtasks: t.subtasks || [],
+});
+
 export async function fetchTasks(userId) {
   const PAGE = 1000;
   let from = 0, allRows = [];
@@ -15,14 +23,9 @@ export async function fetchTasks(userId) {
   const map = {};
   for (const t of allRows) {
     if (!map[t.date]) map[t.date] = [];
-    map[t.date].push({
-      id: t.id, text: t.text, time: t.time, reminder: t.reminder,
-      done: t.done, position: t.position ?? 0,
-      category: t.category || null, recurrence: t.recurrence || null,
-      priority: t.priority || null, notes: t.notes || null,
-      subtasks: t.subtasks || [],
-    });
+    map[t.date].push(mapTaskRow(t));
   }
+  Object.values(map).forEach(dayTasks => dayTasks.sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
   return map;
 }
 

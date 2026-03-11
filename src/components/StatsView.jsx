@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { T } from "../theme";
 import { X } from "lucide-react";
 import { CATEGORIES } from "../constants";
-import { pad } from "../helpers";
+import { getWeekStart, pad } from "../helpers";
 
 export default function StatsView({ tasks, today, onClose }) {
   const stats = useMemo(() => {
@@ -12,9 +12,7 @@ export default function StatsView({ tasks, today, onClose }) {
     });
 
     // This week vs last week
-    const todayDate = new Date(today + "T12:00:00");
-    const weekStart = new Date(todayDate);
-    weekStart.setDate(weekStart.getDate() - todayDate.getDay() + 1);
+    const weekStart = new Date(getWeekStart(today) + "T12:00:00");
     const lastWeekStart = new Date(weekStart);
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 

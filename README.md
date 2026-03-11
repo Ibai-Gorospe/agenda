@@ -1,93 +1,234 @@
 # Agenda
 
-**Tu tiempo, tu orden** — PWA de gestion de tareas personal con soporte offline, vistas de calendario y seguimiento de peso.
+PWA personal de tareas con calendario, soporte offline, seguimiento de peso y recordatorios.
 
-## Funcionalidades
+## Resumen
 
-- **Tareas**: crear, editar, eliminar, duplicar, mover entre dias, subtareas, notas
-- **Recurrencia**: diaria, L-V, dias personalizados, mensual (auto-crea la siguiente al completar)
-- **Categorias**: Personal, Trabajo, Salud, Estudio, Hogar, Entreno (gym)
-- **Prioridad**: Alta, Media, Baja con indicadores de color
-- **Vistas**: Dia (con drag & drop), Semana, Mes, Ano, Peso
-- **Busqueda global**: Ctrl+K
-- **Modo oscuro**: toggle en header, respeta preferencia del sistema
-- **Offline-first**: cola de operaciones en localStorage, sincroniza al volver online
-- **Notificaciones**: recordatorios via Notification API del navegador + emails programados
-- **Seguimiento de peso**: registro diario, grafico de 30 dias con media movil, objetivo
-- **Estadisticas**: tareas completadas, racha, comparativa semanal, por categoria, mejor dia
-- **PWA**: instalable como app, standalone mode, service worker con auto-update
+Agenda esta pensada para uso diario desde movil o escritorio:
+
+- Gestion de tareas por dia, semana, mes y ano
+- Drag and drop para reordenar tareas
+- Tareas recurrentes, prioridades, categorias, notas y subtareas
+- Cola offline con sincronizacion al volver la conexion
+- Busqueda global y estadisticas de productividad
+- Seguimiento de peso con objetivo, grafica y metricas
+- Autenticacion con Supabase y modo invitado
+- PWA instalable con auto update
+- Recordatorios en navegador y emails programados con Supabase Edge Functions
 
 ## Stack
 
 | Capa | Tecnologia |
-|------|-----------|
-| Frontend | React 18 |
-| Build | Vite 5 + vite-plugin-pwa |
-| Backend | Supabase (PostgreSQL + Auth + Edge Functions) |
-| Drag & Drop | @dnd-kit |
-| Despliegue | Vercel |
+| --- | --- |
+| UI | React 18 |
+| Build | Vite 5 |
+| PWA | `vite-plugin-pwa` |
+| Backend | Supabase |
+| Drag and drop | `@dnd-kit` |
+| Testing | Vitest + Testing Library |
+| Deploy | Vercel |
 
-## Estructura del proyecto
+## Funcionalidades
 
-```
-src/
-  App.jsx              # Componente raiz, estado y logica principal
-  theme.js             # Design tokens con CSS custom properties (light/dark)
-  constants.js         # Categorias, prioridades, meses/dias en espanol
-  helpers.js           # Utilidades de fecha, recurrencia, IDs
-  supabase.js          # Cliente Supabase
-  api/
-    tasks.js           # CRUD de tareas
-    notifications.js   # Notificaciones del navegador
-    weightLogs.js      # Registros de peso
-  hooks/
-    useOfflineQueue.js # Cola offline con localStorage
-    useSwipeNav.js     # Navegacion por gestos tactiles
-    useFocusTrap.js    # Trampa de foco para modales
-  components/
-    DayView.jsx        # Vista de dia con drag-drop y filtros
-    WeekView.jsx       # Vista de semana
-    MonthView.jsx      # Calendario mensual
-    YearView.jsx       # Vista anual
-    WeightView.jsx     # Seguimiento de peso con grafico SVG
-    TaskModal.jsx      # Modal crear/editar tarea
-    SearchModal.jsx    # Busqueda global
-    StatsView.jsx      # Estadisticas
-    LoginScreen.jsx    # Autenticacion
-    ToastContainer.jsx # Notificaciones in-app
-    ...
-supabase/
-  functions/
-    send-reminders/    # Edge function para emails de recordatorio
-```
+### Tareas
 
-## Desarrollo
+- Crear, editar, duplicar, mover y eliminar tareas
+- Reordenacion manual por drag and drop
+- Prioridades `high`, `medium`, `low`
+- Categorias predefinidas: personal, trabajo, salud, estudio, hogar y gym
+- Subtareas y notas
+- Filtro por categoria en vista diaria
+- Busqueda global con `Ctrl + K`
+
+### Recurrencia
+
+- Diaria
+- Laborables
+- Dias personalizados
+- Mensual
+- Creacion automatica de la siguiente ocurrencia al completar
+
+### Navegacion y vistas
+
+- Vista de dia
+- Vista semanal
+- Vista mensual
+- Vista anual
+- Vista de peso
+- Navegacion tactil en vista diaria
+- Shortcut PWA `/?action=new-task`
+
+### Offline y sincronizacion
+
+- Cola en `localStorage`
+- Las operaciones offline se sincronizan al recuperar la red
+- Cobertura para crear, editar, completar, mover, reordenar y borrar
+
+### Peso y estadisticas
+
+- Registro diario de peso
+- Objetivo de peso
+- Grafica SVG con media movil
+- Minimo, media, maximo, variacion semanal y mensual
+- Estadisticas de tareas completadas, pendientes, racha y productividad por dia
+
+### Notificaciones
+
+- Recordatorios locales con Notification API
+- Emails programados mediante una Edge Function
+
+## Requisitos
+
+- Node.js 18 o superior
+- Un proyecto de Supabase
+- Opcional: cuenta de Resend si quieres emails de recordatorio
+
+## Puesta en marcha
+
+### 1. Instalar dependencias
 
 ```bash
-# Instalar dependencias
 npm install
-
-# Servidor de desarrollo
-npm run dev
-
-# Build de produccion
-npm run build
-
-# Preview del build
-npm run preview
 ```
 
-### Variables de entorno
+Si PowerShell bloquea `npm`, usa `npm.cmd`.
 
-Crea un archivo `.env` basado en `.env.example`:
+### 2. Configurar variables de entorno del frontend
 
-```
+Copia `.env.example` a `.env` y rellena tus claves:
+
+```bash
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu-anon-key
 ```
 
-## Sistema de temas
+### 3. Crear tablas y politicas en Supabase
 
-Los colores se definen como CSS custom properties en `theme.js`. Los componentes usan `T.xxx` que resuelve a `var(--xxx)`, adaptandose automaticamente al modo claro/oscuro.
+Ejecuta estos scripts en el SQL Editor de Supabase, en este orden:
 
-La preferencia se guarda en localStorage (`agenda-dark`) y respeta `prefers-color-scheme` del sistema como valor inicial.
+1. `supabase_setup.sql`
+   Crea la tabla `tasks` y activa RLS.
+2. `supabase_migration.sql`
+   Anade la columna `position` y recalcula el orden inicial.
+3. `supabase_weight_logs.sql`
+   Crea `weight_logs`.
+4. `supabase_user_settings.sql`
+   Crea `user_settings` para el objetivo de peso.
+5. `supabase_email_notifications.sql`
+   Crea `email_notification_log` para evitar duplicados en emails.
+
+### 4. Desarrollo local
+
+```bash
+npm run dev
+```
+
+La app arranca con Vite en modo desarrollo.
+
+## Scripts disponibles
+
+```bash
+npm run dev
+npm run build
+npm run preview
+npm run test
+npm run test:run
+```
+
+## Tests
+
+La suite actual cubre utilidades, hooks de navegacion y toasts, logica offline, vista de peso y estadisticas.
+
+Ejecucion recomendada:
+
+```bash
+npm run test:run
+```
+
+## Edge Function de emails
+
+La funcion esta en `supabase/functions/send-reminders/index.ts`.
+
+Se apoya en estas variables de entorno dentro de Supabase:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY`
+- `CRON_SECRET`
+
+La funcion:
+
+- Busca tareas pendientes con recordatorio activo
+- Resuelve recurrencias para hoy y para avisos de 1 dia antes
+- Evita duplicados usando `email_notification_log`
+- Envia emails via Resend
+
+## Estructura del proyecto
+
+```text
+src/
+  App.jsx
+  constants.js
+  helpers.js
+  main.jsx
+  supabase.js
+  theme.js
+  api/
+    notifications.js
+    tasks.js
+    weightLogs.js
+  components/
+    DayView.jsx
+    LoginScreen.jsx
+    MonthView.jsx
+    MoveTaskPicker.jsx
+    PendingTasksSelector.jsx
+    SearchModal.jsx
+    SortableTask.jsx
+    SortableWorkoutTask.jsx
+    StatsView.jsx
+    TaskModal.jsx
+    ToastContainer.jsx
+    WeekView.jsx
+    WeightView.jsx
+    YearView.jsx
+  hooks/
+    useAuth.js
+    useFocusTrap.js
+    useKeyboardShortcuts.js
+    useNavigation.js
+    useOfflineQueue.js
+    useSwipeNav.js
+    useTaskManager.js
+    useTheme.js
+    useToast.js
+  test/
+    *.test.js
+    *.test.jsx
+
+supabase/
+  functions/
+    send-reminders/
+      index.ts
+```
+
+## Flujo de datos
+
+- `useAuth` gestiona sesion y modo invitado.
+- `useTaskManager` concentra la logica de tareas, sincronizacion y cola offline.
+- `tasks.js` y `weightLogs.js` encapsulan acceso a Supabase.
+- `WeightView` y `StatsView` calculan metricas en cliente.
+- `vite-plugin-pwa` genera `manifest.webmanifest` y service worker.
+
+## Deploy
+
+- `vercel.json` reescribe todas las rutas a `/` para soportar la SPA.
+- `npm run build` genera `dist/`.
+- La PWA se construye junto al bundle de Vite.
+
+## Estado actual
+
+Verificacion local mas reciente:
+
+- `npm run test:run`: OK
+- `npm run build`: OK

@@ -10,6 +10,7 @@ function WeightView({ user, today, onCreateAccount }) {
   const [weightInput, setWeightInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [showDailyLog, setShowDailyLog] = useState(false);
   const [goalWeight, setGoalWeight] = useState(null);
   const [goalInput, setGoalInput] = useState("");
@@ -19,17 +20,33 @@ function WeightView({ user, today, onCreateAccount }) {
   const isGuest = user?.guest;
 
   useEffect(() => {
-    if (!user || isGuest) { setLoading(false); return; }
+    let cancelled = false;
+    if (!user || isGuest) {
+      setLogs([]);
+      setGoalWeight(null);
+      setGoalInput("");
+      setErrorMessage("");
+      setLoading(false);
+      return undefined;
+    }
+    setLoading(true);
+    setErrorMessage("");
     Promise.all([
       fetchWeightLogs(user.id),
       fetchWeightGoal(user.id).catch(() => null),
     ]).then(([data, goal]) => {
+      if (cancelled) return;
       setLogs(data);
       const todayLog = data.find(l => l.date === today);
-      if (todayLog) setWeightInput(String(todayLog.weight_kg));
-      if (goal) { setGoalWeight(goal); setGoalInput(String(goal)); }
-      setLoading(false);
+      setWeightInput(todayLog ? String(todayLog.weight_kg) : "");
+      setGoalWeight(goal);
+      setGoalInput(goal != null ? String(goal) : "");
+    }).catch(() => {
+      if (!cancelled) setErrorMessage("No se pudieron cargar los registros de peso.");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
+    return () => { cancelled = true; };
   }, [user, today, isGuest]);
 
   // Update input when switching dates
@@ -42,29 +59,46 @@ function WeightView({ user, today, onCreateAccount }) {
     const val = parseFloat(weightInput.replace(",", "."));
     if (isNaN(val) || val < 20 || val > 300) return;
     setSaving(true);
-    await upsertWeightLog(user.id, selectedDate, val);
-    setLogs(prev => {
-      const filtered = prev.filter(l => l.date !== selectedDate);
-      return [...filtered, { date: selectedDate, weight_kg: val }].sort((a, b) => a.date.localeCompare(b.date));
-    });
-    setSaving(false);
+    setErrorMessage("");
+    try {
+      const savedLog = await upsertWeightLog(user.id, selectedDate, val);
+      setLogs(prev => {
+        const filtered = prev.filter(l => l.date !== selectedDate);
+        return [...filtered, savedLog].sort((a, b) => a.date.localeCompare(b.date));
+      });
+    } catch {
+      setErrorMessage("No se pudo guardar el peso.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (logDate) => {
     const log = logs.find(l => l.date === logDate);
     if (!log) return;
-    await deleteWeightLog(log.id);
-    setLogs(prev => prev.filter(l => l.date !== logDate));
-    setConfirmDeleteDate(null);
-    if (logDate === selectedDate) setWeightInput("");
+    setErrorMessage("");
+    try {
+      await deleteWeightLog(log.id);
+      setLogs(prev => prev.filter(l => l.date !== logDate));
+      if (logDate === selectedDate) setWeightInput("");
+    } catch {
+      setErrorMessage("No se pudo eliminar el registro de peso.");
+    } finally {
+      setConfirmDeleteDate(null);
+    }
   };
 
   const saveGoal = async () => {
     const val = parseFloat(goalInput.replace(",", "."));
     if (isNaN(val) || val < 20 || val > 300) return;
-    await upsertWeightGoal(user.id, val);
-    setGoalWeight(val);
-    setShowGoalInput(false);
+    setErrorMessage("");
+    try {
+      await upsertWeightGoal(user.id, val);
+      setGoalWeight(val);
+      setShowGoalInput(false);
+    } catch {
+      setErrorMessage("No se pudo guardar el objetivo.");
+    }
   };
 
   // Guest state
@@ -196,6 +230,16 @@ function WeightView({ user, today, onCreateAccount }) {
 
   return (
     <div style={{ padding: "1.25rem 1rem 2rem", maxWidth: "600px", margin: "0 auto" }}>
+      {errorMessage && (
+        <div role="alert" style={{
+          background: T.dangerBg, color: T.dangerText,
+          border: `1px solid ${T.danger}20`, borderRadius: T.r4,
+          padding: ".75rem .9rem", marginBottom: "1rem", fontSize: ".84rem",
+        }}>
+          {errorMessage}
+        </div>
+      )}
+
       {/* Weight input card */}
       <div style={{
         background: T.accentGrad, borderRadius: T.r5, padding: "1.5rem",
@@ -460,12 +504,12 @@ function WeightView({ user, today, onCreateAccount }) {
                         {isConfirming ? (
                           <div style={{ display: "flex", gap: ".3rem", alignItems: "center" }}>
                             <span style={{ fontSize: ".7rem", color: T.danger, fontWeight: 600 }}>¿Eliminar?</span>
-                            <button onClick={() => handleDelete(l.date)} style={{
+                            <button onClick={() => handleDelete(l.date)} aria-label={`Confirmar eliminacion del registro ${l.date}`} style={{
                               background: T.dangerBg, border: "none", borderRadius: T.r2,
                               color: T.dangerText, padding: "3px 8px", cursor: "pointer",
                               fontSize: ".7rem", fontWeight: 700,
                             }}>Sí</button>
-                            <button onClick={() => setConfirmDeleteDate(null)} style={{
+                            <button onClick={() => setConfirmDeleteDate(null)} aria-label={`Cancelar eliminacion del registro ${l.date}`} style={{
                               background: T.bg, border: "none", borderRadius: T.r2,
                               color: T.textMuted, padding: "3px 8px", cursor: "pointer",
                               fontSize: ".7rem", fontWeight: 600,
@@ -480,13 +524,16 @@ function WeightView({ user, today, onCreateAccount }) {
                             )}
                             <span style={{ fontSize: "1.1rem", fontWeight: 700, color: isTodayEntry ? T.accentDark : T.text }}>{l.weight_kg.toFixed(1)}</span>
                             <span style={{ fontSize: ".72rem", color: T.textMuted }}>kg</span>
-                            <button onClick={() => setConfirmDeleteDate(l.date)} style={{
-                              background: "transparent", border: "none", cursor: "pointer",
-                              padding: "4px", display: "flex", alignItems: "center",
-                              color: T.textMuted, opacity: .5, transition: "opacity .15s",
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.opacity = "1"}
-                            onMouseLeave={e => e.currentTarget.style.opacity = ".5"}>
+                            <button
+                              onClick={() => setConfirmDeleteDate(l.date)}
+                              aria-label={`Eliminar registro de peso del ${l.date}`}
+                              style={{
+                                background: "transparent", border: "none", cursor: "pointer",
+                                padding: "4px", display: "flex", alignItems: "center",
+                                color: T.textMuted, opacity: .5, transition: "opacity .15s",
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+                              onMouseLeave={e => e.currentTarget.style.opacity = ".5"}>
                               <Trash2 size={13} />
                             </button>
                           </>

@@ -1,45 +1,69 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { supabase } from "../supabase";
 import { todayStr, nextRecurrenceDate, genId, formatDateLabel } from "../helpers";
 import { TIMINGS } from "../constants";
 import { fetchTasks, upsertTask, deleteTaskDB, batchUpsertPositions } from "../api/tasks";
 import { supportsNotif, scheduleNotification } from "../api/notifications";
 import { useOfflineQueue } from "./useOfflineQueue";
 
+const byPosition = (a, b) => (a.position ?? 0) - (b.position ?? 0);
+const asQueueOps = (ops) => (Array.isArray(ops) ? ops : [ops]).filter(Boolean);
+const upsertQueueOp = (date, task) => ({ type: "upsert", date, task });
+const deleteQueueOp = (id) => ({ type: "delete", id });
+const getNextPosition = (dayTasks = []) => {
+  if (!dayTasks.length) return 0;
+  return Math.max(...dayTasks.map(t => t.position ?? 0)) + 1;
+};
+
 export function useTaskManager(user, addToast) {
-  const [tasks, setTasks] = useState({});
+  const [tasks, setTasksState] = useState({});
   const [syncing, setSyncing] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [dismissedPendingBanner, setDismissedPendingBanner] = useState(false);
   const [showPendingSelector, setShowPendingSelector] = useState(false);
+  const tasksRef = useRef({});
   const undoRef = useRef(null);
-  const { enqueue, flush } = useOfflineQueue();
+  const { enqueueMany, flush } = useOfflineQueue();
 
-  // Load tasks when user changes
+  const setTasks = useCallback((value) => {
+    const nextTasks = typeof value === "function" ? value(tasksRef.current) : value;
+    tasksRef.current = nextTasks;
+    setTasksState(nextTasks);
+  }, []);
+
   useEffect(() => {
-    if (user === undefined) return;
-    if (!user || user.guest) { setTasks({}); return; }
+    let cancelled = false;
+    if (user === undefined) return undefined;
+    if (!user || user.guest) {
+      setTasks({});
+      setTasksLoading(false);
+      return undefined;
+    }
     setTasksLoading(true);
     fetchTasks(user.id)
-      .then(setTasks)
-      .catch(() => addToast("No se pudieron cargar las tareas. Revisa tu conexión.", "error"))
-      .finally(() => setTasksLoading(false));
-  }, [user, addToast]);
+      .then((nextTasks) => {
+        if (!cancelled) setTasks(nextTasks);
+      })
+      .catch(() => {
+        if (!cancelled) addToast("No se pudieron cargar las tareas. Revisa tu conexión.", "error");
+      })
+      .finally(() => {
+        if (!cancelled) setTasksLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [user, addToast, setTasks]);
 
-  // Request notification permission
   useEffect(() => {
     if (supportsNotif && Notification.permission === "default") Notification.requestPermission();
   }, []);
 
-  // Online/offline detection + flush queue
   useEffect(() => {
     const goOnline = async () => {
       setIsOnline(true);
       if (user && !user.guest) {
         try {
           await flush(user.id);
-          addToast("Conexión restaurada — cambios sincronizados", "success", null, 2500);
+          addToast("Conexión restaurada - cambios sincronizados", "success", null, 2500);
         } catch {
           addToast("Conexión restaurada", "success", null, 2500);
         }
@@ -50,172 +74,185 @@ export function useTaskManager(user, addToast) {
     const goOffline = () => { setIsOnline(false); };
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
-    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
   }, [addToast, user, flush]);
 
-  // Flush pending deletes when page is hidden
+  const withSync = useCallback(async (fn, queueOps = []) => {
+    const ops = asQueueOps(queueOps);
+    if (!isOnline && ops.length) {
+      enqueueMany(ops);
+      return false;
+    }
+    setSyncing(true);
+    try {
+      await fn();
+      return true;
+    } catch (err) {
+      if (ops.length) enqueueMany(ops);
+      else addToast(err.message || "Error de sincronización", "error");
+      return false;
+    } finally {
+      setSyncing(false);
+    }
+  }, [isOnline, addToast, enqueueMany]);
+
+  const finalizeDelete = useCallback(async (taskId) => {
+    if (!user || user.guest) return;
+    const synced = await withSync(
+      async () => { await deleteTaskDB(taskId); },
+      deleteQueueOp(taskId)
+    );
+    if (!synced && isOnline) addToast("Error al eliminar en el servidor", "error");
+  }, [user, withSync, isOnline, addToast]);
+
   useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "hidden" && undoRef.current && user && !user.guest) {
-        const { task: t, timer } = undoRef.current;
-        clearTimeout(timer);
-        undoRef.current = null;
-        try { await deleteTaskDB(t.id); } catch { /* best effort */ }
-      }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden" || !undoRef.current) return;
+      const { task, timer } = undoRef.current;
+      clearTimeout(timer);
+      undoRef.current = null;
+      void finalizeDelete(task.id);
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [user]);
-
-  // ── Sync wrapper (offline-aware) ──
-  const withSync = useCallback(async (fn, queueOp = null) => {
-    if (!isOnline && queueOp) {
-      enqueue(queueOp);
-      return;
-    }
-    setSyncing(true);
-    try { await fn(); }
-    catch (err) {
-      if (queueOp) enqueue(queueOp);
-      else addToast(err.message || "Error de sincronización", "error");
-    }
-    finally { setSyncing(false); }
-  }, [isOnline, addToast, enqueue]);
+  }, [finalizeDelete]);
 
   const persistTask = useCallback(async (date, task) => {
-    let savedTask;
-    setTasks(prev => {
-      const dayTasks = prev[date] || [];
-      const idx = dayTasks.findIndex(t => t.id === task.id);
-      savedTask = idx >= 0
-        ? { ...task, position: dayTasks[idx].position }
-        : { ...task, position: dayTasks.length };
-      const newDay = idx >= 0
-        ? dayTasks.map(t => t.id === task.id ? savedTask : t)
-        : [...dayTasks, savedTask];
-      return { ...prev, [date]: newDay };
-    });
+    const currentTasks = tasksRef.current;
+    const dayTasks = currentTasks[date] || [];
+    const idx = dayTasks.findIndex(t => t.id === task.id);
+    const savedTask = idx >= 0
+      ? { ...task, position: dayTasks[idx].position ?? 0 }
+      : { ...task, position: getNextPosition(dayTasks) };
+    const newDay = idx >= 0
+      ? dayTasks.map(t => t.id === task.id ? savedTask : t)
+      : [...dayTasks, savedTask];
+    setTasks({ ...currentTasks, [date]: newDay });
     if (user && !user.guest) {
       await withSync(
         async () => {
           await upsertTask(user.id, date, savedTask);
           scheduleNotification(savedTask, date);
         },
-        { type: "upsert", date, task: savedTask }
+        upsertQueueOp(date, savedTask)
       );
     }
   }, [user, withSync]);
 
   const handleToggle = useCallback(async (date, id) => {
-    let updatedTask, nextDate, nextTask;
-    setTasks(prev => {
-      const task = (prev[date] || []).find(t => t.id === id);
-      if (!task) return prev;
-      const nowDone = !task.done;
-      updatedTask = { ...task, done: nowDone };
-
-      if (nowDone && task.recurrence) {
-        nextDate = nextRecurrenceDate(date, task.recurrence);
-        if (nextDate) {
-          nextTask = { ...task, id: genId(), done: false, position: (prev[nextDate] || []).length };
-        }
+    const currentTasks = tasksRef.current;
+    const dayTasks = currentTasks[date] || [];
+    const task = dayTasks.find(t => t.id === id);
+    if (!task) return;
+    const updatedTask = { ...task, done: !task.done };
+    let nextDate;
+    let nextTask;
+    if (updatedTask.done && task.recurrence) {
+      nextDate = nextRecurrenceDate(date, task.recurrence);
+      if (nextDate) {
+        nextTask = {
+          ...task,
+          id: genId(),
+          done: false,
+          position: getNextPosition(currentTasks[nextDate] || []),
+        };
       }
+    }
+    const newState = { ...currentTasks, [date]: dayTasks.map(t => t.id === id ? updatedTask : t) };
+    if (nextDate && nextTask) {
+      newState[nextDate] = [...(newState[nextDate] || []), nextTask];
+    }
+    setTasks(newState);
 
-      const newState = { ...prev, [date]: (prev[date] || []).map(t => t.id === id ? updatedTask : t) };
-      if (nextDate && nextTask) {
-        newState[nextDate] = [...(newState[nextDate] || []), nextTask];
-      }
-      return newState;
-    });
-
-    if (user && !user.guest && updatedTask) {
+    if (user && !user.guest) {
       await withSync(async () => {
         await upsertTask(user.id, date, updatedTask);
         if (nextDate && nextTask) {
           await upsertTask(user.id, nextDate, nextTask);
+          scheduleNotification(nextTask, nextDate);
         }
-      });
+      }, [
+        upsertQueueOp(date, updatedTask),
+        nextDate && nextTask ? upsertQueueOp(nextDate, nextTask) : null,
+      ]);
     }
 
     if (updatedTask?.done && nextDate && nextTask) {
       addToast(`Siguiente repetición creada para ${formatDateLabel(nextDate).split(",")[0]}`, "success", null, 3000);
     }
-  }, [user, withSync, addToast]);
+  }, [user, setTasks, withSync, addToast]);
 
-  const handleDelete = useCallback(async (date, id) => {
-    const task = tasks[date]?.find(t => t.id === id);
+  const handleDelete = useCallback((date, id) => {
+    const currentTasks = tasksRef.current;
+    const task = currentTasks[date]?.find(t => t.id === id);
     if (!task) return;
-    setTasks(prev => ({ ...prev, [date]: (prev[date] || []).filter(t => t.id !== id) }));
+    setTasks({ ...currentTasks, [date]: (currentTasks[date] || []).filter(t => t.id !== id) });
     if (undoRef.current) clearTimeout(undoRef.current.timer);
     const undoData = { date, task, timer: null };
     undoRef.current = undoData;
     addToast("Tarea eliminada", "info", {
       label: "Deshacer",
       fn: () => {
-        if (undoRef.current === undoData) {
-          clearTimeout(undoData.timer);
-          undoRef.current = null;
-          setTasks(prev => {
-            const restored = [...(prev[date] || []), task].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-            return { ...prev, [date]: restored };
-          });
-          addToast("Tarea restaurada", "success", null, TIMINGS.HIGHLIGHT_DURATION);
-        }
-      }
-    }, TIMINGS.UNDO_WINDOW);
-    undoData.timer = setTimeout(async () => {
-      if (undoRef.current === undoData) {
+        if (undoRef.current !== undoData) return;
+        clearTimeout(undoData.timer);
         undoRef.current = null;
-        if (user && !user.guest) {
-          try { await deleteTaskDB(id); }
-          catch { addToast("Error al eliminar en el servidor", "error"); }
-        }
+        setTasks(prevTasks => {
+          const restored = [...(prevTasks[date] || []), task].sort(byPosition);
+          return { ...prevTasks, [date]: restored };
+        });
+        addToast("Tarea restaurada", "success", null, TIMINGS.HIGHLIGHT_DURATION);
       }
     }, TIMINGS.UNDO_WINDOW);
-  }, [tasks, user, addToast]);
+    undoData.timer = setTimeout(() => {
+      if (undoRef.current !== undoData) return;
+      undoRef.current = null;
+      void finalizeDelete(id);
+    }, TIMINGS.UNDO_WINDOW);
+  }, [setTasks, addToast, finalizeDelete]);
 
   const handleDuplicate = useCallback(async (date, task) => {
+    const dayTasks = tasksRef.current[date] || [];
     const newTask = {
       ...task,
       id: genId(),
       done: false,
-      position: (tasks[date] || []).length,
+      position: getNextPosition(dayTasks),
       subtasks: (task.subtasks || []).map(s => ({ ...s, id: genId(), done: false })),
     };
     await persistTask(date, newTask);
     addToast("Tarea duplicada", "success", null, TIMINGS.HIGHLIGHT_DURATION);
-  }, [tasks, persistTask, addToast]);
+  }, [persistTask, addToast]);
 
   const moveTask = useCallback(async (fromDate, toDate, taskId) => {
     if (fromDate === toDate) return;
-    let movedTask;
-    setTasks(prev => {
-      const task = (prev[fromDate] || []).find(t => t.id === taskId);
-      if (!task) return prev;
-      const toLen = (prev[toDate] || []).length;
-      movedTask = { ...task, position: toLen };
-      const fromTasks = (prev[fromDate] || []).filter(t => t.id !== taskId);
-      const toTasks = [...(prev[toDate] || []), movedTask];
-      return { ...prev, [fromDate]: fromTasks, [toDate]: toTasks };
-    });
+    const currentTasks = tasksRef.current;
+    const task = (currentTasks[fromDate] || []).find(t => t.id === taskId);
+    if (!task) return;
+    const movedTask = { ...task, position: getNextPosition(currentTasks[toDate] || []) };
+    const fromTasks = (currentTasks[fromDate] || []).filter(t => t.id !== taskId);
+    const toTasks = [...(currentTasks[toDate] || []), movedTask];
+    setTasks({ ...currentTasks, [fromDate]: fromTasks, [toDate]: toTasks });
     if (user && !user.guest) {
-      await withSync(async () => {
-        await supabase.from("tasks").update({ date: toDate, position: movedTask.position }).eq("id", taskId);
-      });
+      await withSync(
+        async () => { await upsertTask(user.id, toDate, movedTask); },
+        upsertQueueOp(toDate, movedTask)
+      );
     }
-  }, [user, withSync]);
+  }, [user, setTasks, withSync]);
 
   const handleReorder = useCallback(async (date, reorderedTasks) => {
     const withPositions = reorderedTasks.map((t, i) => ({ ...t, position: i }));
-    setTasks(prev => ({ ...prev, [date]: withPositions }));
+    setTasks(prevTasks => ({ ...prevTasks, [date]: withPositions }));
     if (user && !user.guest) {
-      await withSync(async () => {
-        await batchUpsertPositions(user.id, date, withPositions);
-      });
+      await withSync(
+        async () => { await batchUpsertPositions(user.id, date, withPositions); },
+        withPositions.map(task => upsertQueueOp(date, task))
+      );
     }
-  }, [user, withSync]);
-
-  // ── Pending past tasks ──
+  }, [user, setTasks, withSync]);
 
   const pendingPastCount = useMemo(() => {
     const td = todayStr();
@@ -238,39 +275,38 @@ export function useTaskManager(user, addToast) {
     return result.sort((a, b) => b.date.localeCompare(a.date));
   }, [tasks]);
 
-  // Unified move-to-today logic (fixes duplicate code)
   const _moveTasksToToday = useCallback(async (filterFn, remainFn, extraActions) => {
     const todayDate = todayStr();
+    const currentTasks = tasksRef.current;
     const updates = [];
-    setTasks(prev => {
-      const newTasks = {};
-      let todayTasks = [...(prev[todayDate] || [])];
-      let position = todayTasks.length;
-      Object.entries(prev).forEach(([date, dayTasks]) => {
-        if (date >= todayDate) { newTasks[date] = dayTasks; return; }
-        const toMove = dayTasks.filter(filterFn);
-        const remaining = dayTasks.filter(remainFn);
-        toMove.forEach(task => {
-          const movedTask = { ...task, position: position++ };
-          todayTasks.push(movedTask);
-          updates.push({ id: task.id, date: todayDate, position: movedTask.position });
-        });
-        newTasks[date] = remaining;
+    const newTasks = {};
+    const todayTasks = [...(currentTasks[todayDate] || [])];
+    let position = getNextPosition(todayTasks) || 0;
+    Object.entries(currentTasks).forEach(([date, dayTasks]) => {
+      if (date >= todayDate) {
+        newTasks[date] = dayTasks;
+        return;
+      }
+      const toMove = dayTasks.filter(filterFn);
+      const remaining = dayTasks.filter(remainFn);
+      toMove.forEach(task => {
+        const movedTask = { ...task, position: position++ };
+        todayTasks.push(movedTask);
+        updates.push({ date: todayDate, task: movedTask });
       });
-      newTasks[todayDate] = todayTasks;
-      return newTasks;
+      newTasks[date] = remaining;
     });
+    newTasks[todayDate] = todayTasks;
+    setTasks(newTasks);
     setDismissedPendingBanner(true);
     if (extraActions) extraActions();
-    if (user && !user.guest) {
+    if (user && !user.guest && updates.length > 0) {
       await withSync(async () => {
-        await Promise.all(
-          updates.map(u => supabase.from("tasks").update({ date: u.date, position: u.position }).eq("id", u.id))
-        );
-      });
+        await Promise.all(updates.map(({ date, task }) => upsertTask(user.id, date, task)));
+      }, updates.map(({ date, task }) => upsertQueueOp(date, task)));
     }
     return updates.length;
-  }, [user, withSync]);
+  }, [user, setTasks, withSync]);
 
   const moveAllPendingToToday = useCallback(async () => {
     await _moveTasksToToday(t => !t.done, t => t.done);
