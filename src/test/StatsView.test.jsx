@@ -24,4 +24,23 @@ describe("StatsView", () => {
     expect(within(thisWeek).getByText("1")).toBeInTheDocument();
     expect(within(lastWeek).getByText("2")).toBeInTheDocument();
   });
+
+  it("ignores skipped tasks in pending and completed totals", () => {
+    render(
+      <StatsView
+        today="2026-03-11"
+        onClose={() => {}}
+        tasks={{
+          "2026-03-11": [
+            { id: "done-task", text: "Hecha", state: "done" },
+            { id: "open-task", text: "Abierta", state: "open" },
+            { id: "skipped-task", text: "Omitida", state: "skipped" },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByText("COMPLETADAS").nextElementSibling).toHaveTextContent("1");
+    expect(screen.getByText("PENDIENTES").nextElementSibling).toHaveTextContent("1");
+  });
 });

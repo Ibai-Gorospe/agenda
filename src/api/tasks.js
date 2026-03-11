@@ -1,11 +1,17 @@
 import { supabase } from "../supabase";
+import { getTaskRolloverMode, getTaskState, isTaskDone } from "../helpers";
 
 const mapTaskRow = (t) => ({
   id: t.id, text: t.text, time: t.time, reminder: t.reminder,
-  done: t.done, position: t.position ?? 0,
+  done: t.state ? t.state === "done" : t.done,
+  state: t.state || (t.done ? "done" : "open"),
+  position: t.position ?? 0,
   category: t.category || null, recurrence: t.recurrence || null,
   priority: t.priority || null, notes: t.notes || null,
   subtasks: t.subtasks || [],
+  seriesId: t.series_id || t.id,
+  scheduledDate: t.scheduled_date || t.date,
+  rolloverMode: t.rollover_mode || (t.category === "gym" ? "anchor" : "carry"),
 });
 
 export async function fetchTasks(userId) {
@@ -33,13 +39,17 @@ export async function upsertTask(userId, date, task) {
   const { error } = await supabase.from("tasks").upsert({
     id: task.id, user_id: userId, date,
     text: task.text, time: task.time || null,
-    reminder: task.reminder || "0", done: task.done,
+    reminder: task.reminder || "0", done: isTaskDone(task),
+    state: getTaskState(task),
     position: task.position ?? 0,
     category: task.category || null,
     recurrence: task.recurrence || null,
     priority: task.priority || null,
     notes: task.notes || null,
     subtasks: task.subtasks || [],
+    series_id: task.seriesId || task.id,
+    scheduled_date: task.scheduledDate || date,
+    rollover_mode: getTaskRolloverMode(task),
   });
   if (error) throw new Error("Error al guardar tarea");
 }
@@ -53,13 +63,17 @@ export async function batchUpsertPositions(userId, date, tasks) {
   const rows = tasks.map(t => ({
     id: t.id, user_id: userId, date,
     text: t.text, time: t.time || null,
-    reminder: t.reminder || "0", done: t.done,
+    reminder: t.reminder || "0", done: isTaskDone(t),
+    state: getTaskState(t),
     position: t.position ?? 0,
     category: t.category || null,
     recurrence: t.recurrence || null,
     priority: t.priority || null,
     notes: t.notes || null,
     subtasks: t.subtasks || [],
+    series_id: t.seriesId || t.id,
+    scheduled_date: t.scheduledDate || date,
+    rollover_mode: getTaskRolloverMode(t),
   }));
   const { error } = await supabase.from("tasks").upsert(rows);
   if (error) throw new Error("Error al reordenar tareas");

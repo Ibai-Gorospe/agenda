@@ -1,6 +1,6 @@
 import { T } from "../theme";
 
-export default function CompletedDivider({ count }) {
+export default function CompletedDivider({ count, label = "Completadas" }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: ".5rem",
@@ -11,7 +11,7 @@ export default function CompletedDivider({ count }) {
         fontSize: ".7rem", fontWeight: 600, color: T.textMuted,
         letterSpacing: ".05em", textTransform: "uppercase",
       }}>
-        Completadas ({count})
+        {label} ({count})
       </span>
       <div style={{ flex: 1, height: "1px", background: T.borderGray }} />
     </div>

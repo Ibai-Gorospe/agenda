@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { T } from "../theme";
 import { Check } from "lucide-react";
-import { pad, isWeekend } from "../helpers";
+import { pad, isWeekend, isTaskDone, isTaskOpen, isTaskSkipped } from "../helpers";
 
 function WeekView({ startDate, tasks, onSelectDay, today }) {
   const days = [];
@@ -15,8 +15,9 @@ function WeekView({ startDate, tasks, onSelectDay, today }) {
     <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: ".6rem" }}>
       {days.map(dateStr => {
         const dayTasks = tasks[dateStr] || [];
-        const pending = dayTasks.filter(t => !t.done).length;
-        const done = dayTasks.filter(t => t.done).length;
+        const pending = dayTasks.filter(isTaskOpen).length;
+        const done = dayTasks.filter(isTaskDone).length;
+        const skipped = dayTasks.filter(isTaskSkipped).length;
         const isToday = dateStr === today;
         const weekend = isWeekend(dateStr);
         const [, , d] = dateStr.split("-");
@@ -56,10 +57,11 @@ function WeekView({ startDate, tasks, onSelectDay, today }) {
                   </span>
                 : dayTasks.slice(0, 2).map(t => (
                   <p key={t.id} style={{
-                    color: isToday ? (t.done ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.9)")
-                      : (t.done ? T.textMuted : T.textSub),
+                    color: isToday
+                      ? (isTaskOpen(t) ? "rgba(255,255,255,.9)" : "rgba(255,255,255,.5)")
+                      : (isTaskOpen(t) ? T.textSub : T.textMuted),
                     margin: "0 0 .15rem", fontSize: ".82rem",
-                    textDecoration: t.done ? "line-through" : "none",
+                    textDecoration: isTaskDone(t) ? "line-through" : "none",
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>
                     {t.time ? <span style={{ fontWeight: 600, marginRight: ".3rem" }}>{t.time}</span> : null}
@@ -86,6 +88,10 @@ function WeekView({ startDate, tasks, onSelectDay, today }) {
                   color: isToday ? "rgba(255,255,255,.5)" : T.textMuted,
                   display: "flex", alignItems: "center", gap: ".2rem", justifyContent: "flex-end",
                 }}>{done} <Check size={12} strokeWidth={2.5} /></div>}
+                {skipped > 0 && <div style={{
+                  fontSize: ".7rem",
+                  color: isToday ? "rgba(255,255,255,.45)" : T.textMuted,
+                }}>{skipped} omitida{skipped > 1 ? "s" : ""}</div>}
               </div>
             )}
           </button>

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { T } from "../theme";
 import { DAYS_ES } from "../constants";
-import { pad, isWeekend } from "../helpers";
+import { pad, isWeekend, isTaskDone, isTaskOpen } from "../helpers";
 
 function MonthView({ year, month, tasks, onSelectDay, today }) {
   const firstDay = new Date(year, month, 1).getDay();
@@ -26,7 +26,8 @@ function MonthView({ year, month, tasks, onSelectDay, today }) {
           if (!d) return <div key={`e${i}`} />;
           const dateStr = `${year}-${pad(month + 1)}-${pad(d)}`;
           const dayTasks = tasks[dateStr] || [];
-          const pending = dayTasks.filter(t => !t.done).length;
+          const pending = dayTasks.filter(isTaskOpen).length;
+          const done = dayTasks.filter(isTaskDone).length;
           const allDone = dayTasks.length > 0 && pending === 0;
           const isToday = dateStr === today;
           const weekend = isWeekend(dateStr);
@@ -54,7 +55,7 @@ function MonthView({ year, month, tasks, onSelectDay, today }) {
                 <span style={{
                   width: "5px", height: "5px", borderRadius: "50%",
                   background: isToday ? "rgba(255,255,255,.7)"
-                    : allDone ? T.textMuted
+                    : allDone && done > 0 ? T.textMuted
                     : weekend ? T.weekend : T.accent,
                 }} />
               )}

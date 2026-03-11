@@ -34,12 +34,23 @@ const setOffline = () => {
   Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
 };
 
+const setOnline = () => {
+  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+};
+
 const renderTaskManager = async (user = { id: "user-1" }, addToast = vi.fn()) => {
   const rendered = renderHook(() => useTaskManager(user, addToast));
   await act(async () => { await Promise.resolve(); });
   act(() => {
     window.dispatchEvent(new Event("offline"));
   });
+  return rendered;
+};
+
+const renderOnlineTaskManager = async (user = { id: "user-1" }, addToast = vi.fn()) => {
+  setOnline();
+  const rendered = renderHook(() => useTaskManager(user, addToast));
+  await act(async () => { await Promise.resolve(); });
   return rendered;
 };
 
@@ -161,10 +172,212 @@ describe("useTaskManager", () => {
       expect.objectContaining({
         type: "upsert",
         date: "2026-03-11",
-        task: expect.objectContaining({ id: "task-1", position: 3 }),
+        task: expect.objectContaining({
+          id: "task-1",
+          position: 3,
+          scheduledDate: "2026-03-09",
+        }),
       }),
     ]);
     expect(addToast).toHaveBeenCalledWith("1 tarea movida a hoy", "success", null, 3000);
+  });
+
+  it("materializes today's recurring instance from an overdue task", async () => {
+    const { result } = await renderTaskManager();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-11T12:00:00"));
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-10": [{
+          id: "task-1",
+          text: "Pastilla",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-10",
+        }],
+      });
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.tasks["2026-03-11"]).toHaveLength(1);
+    expect(result.current.tasks["2026-03-11"][0]).toEqual(expect.objectContaining({
+      text: "Pastilla",
+      done: false,
+      recurrence: "daily",
+      seriesId: "series-1",
+      scheduledDate: "2026-03-11",
+    }));
+    expect(mockEnqueueMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        type: "upsert",
+        date: "2026-03-11",
+        task: expect.objectContaining({
+          text: "Pastilla",
+          scheduledDate: "2026-03-11",
+        }),
+      }),
+    ]);
+  });
+
+  it("excludes anchor tasks from past pending selectors", async () => {
+    const { result } = await renderTaskManager();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-11T12:00:00"));
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-09": [
+          { id: "carry-task", text: "Pastilla", done: false, position: 0, rolloverMode: "carry" },
+          { id: "anchor-task", text: "Gym", done: false, position: 1, rolloverMode: "anchor" },
+        ],
+      });
+    });
+
+    expect(result.current.pendingPastCount).toBe(1);
+    expect(result.current.pendingPastTasks).toEqual([
+      expect.objectContaining({
+        date: "2026-03-09",
+        tasks: [expect.objectContaining({ id: "carry-task" })],
+      }),
+    ]);
+  });
+
+  it("marks older anchor occurrences as skipped once a newer one exists", async () => {
+    const { result } = await renderTaskManager();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-11T12:00:00"));
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-10": [{
+          id: "task-1",
+          text: "Rutina",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-10",
+          rolloverMode: "anchor",
+        }],
+      });
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.tasks["2026-03-10"][0]).toEqual(expect.objectContaining({
+      state: "skipped",
+      done: false,
+      rolloverMode: "anchor",
+    }));
+    expect(result.current.tasks["2026-03-11"][0]).toEqual(expect.objectContaining({
+      state: "open",
+      scheduledDate: "2026-03-11",
+    }));
+  });
+
+  it("does not create another future recurrence when completing an older moved instance", async () => {
+    const { result } = await renderTaskManager();
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-11": [
+          {
+            id: "task-yesterday",
+            text: "Pastilla",
+            done: false,
+            recurrence: "daily",
+            position: 0,
+            seriesId: "series-1",
+            scheduledDate: "2026-03-10",
+          },
+          {
+            id: "task-today",
+            text: "Pastilla",
+            done: false,
+            recurrence: "daily",
+            position: 1,
+            seriesId: "series-1",
+            scheduledDate: "2026-03-11",
+          },
+        ],
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleToggle("2026-03-11", "task-yesterday");
+    });
+
+    expect(result.current.tasks["2026-03-12"]).toBeUndefined();
+  });
+
+  it("toggles subtasks inline and persists the task update", async () => {
+    const { result } = await renderTaskManager();
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-11": [{
+          id: "task-1",
+          text: "Checklist",
+          done: false,
+          position: 0,
+          subtasks: [
+            { id: "sub-1", text: "Paso 1", done: false },
+            { id: "sub-2", text: "Paso 2", done: false },
+          ],
+        }],
+      });
+    });
+
+    await act(async () => {
+      await result.current.toggleSubtask("2026-03-11", "task-1", "sub-1");
+    });
+
+    expect(result.current.tasks["2026-03-11"][0].subtasks[0]).toEqual(expect.objectContaining({ done: true }));
+    expect(mockEnqueueMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        type: "upsert",
+        date: "2026-03-11",
+        task: expect.objectContaining({
+          subtasks: [
+            expect.objectContaining({ id: "sub-1", done: true }),
+            expect.objectContaining({ id: "sub-2", done: false }),
+          ],
+        }),
+      }),
+    ]);
+  });
+
+  it("resets recurrent subtasks in the next occurrence", async () => {
+    const { result } = await renderTaskManager();
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-11": [{
+          id: "task-1",
+          text: "Rutina",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-11",
+          subtasks: [
+            { id: "sub-1", text: "Serie A", done: true },
+            { id: "sub-2", text: "Serie B", done: false },
+          ],
+        }],
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleToggle("2026-03-11", "task-1");
+    });
+
+    expect(result.current.tasks["2026-03-12"][0].subtasks).toEqual([
+      expect.objectContaining({ text: "Serie A", done: false }),
+      expect.objectContaining({ text: "Serie B", done: false }),
+    ]);
   });
 
   it("queues deletes after the undo window while offline", async () => {

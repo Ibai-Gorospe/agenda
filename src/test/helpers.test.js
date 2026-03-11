@@ -3,6 +3,8 @@ import {
   pad, todayStr, formatDateLabel, isWeekend, getWeekStart,
   formatWeekRange, recurrenceToDays, daysToRecurrence,
   getRecurrenceLabel, nextRecurrenceDate, genId, getWeekdayName, dateAdd,
+  getTaskSeriesId, getTaskScheduledDate, getTaskState, isTaskOpen, isTaskDone, isTaskSkipped,
+  getTaskRolloverMode, normalizeTask, resetSubtasks, getScheduledDateBadge,
 } from "../helpers";
 
 describe("pad", () => {
@@ -158,5 +160,56 @@ describe("dateAdd", () => {
   });
   it("crosses year boundary", () => {
     expect(dateAdd("2025-12-31", 1)).toBe("2026-01-01");
+  });
+});
+
+describe("task metadata helpers", () => {
+  it("falls back to id for series id", () => {
+    expect(getTaskSeriesId({ id: "task-1" })).toBe("task-1");
+  });
+
+  it("falls back to visible date for scheduled date", () => {
+    expect(getTaskScheduledDate({ id: "task-1" }, "2026-03-11")).toBe("2026-03-11");
+  });
+
+  it("maps legacy done boolean to task state", () => {
+    expect(getTaskState({ done: true })).toBe("done");
+    expect(getTaskState({ done: false })).toBe("open");
+  });
+
+  it("understands skipped state explicitly", () => {
+    expect(isTaskSkipped({ state: "skipped" })).toBe(true);
+    expect(isTaskOpen({ state: "open" })).toBe(true);
+    expect(isTaskDone({ state: "done" })).toBe(true);
+  });
+
+  it("uses anchor as default rollover mode for gym", () => {
+    expect(getTaskRolloverMode({ category: "gym" })).toBe("anchor");
+    expect(getTaskRolloverMode({ category: "salud" })).toBe("carry");
+  });
+
+  it("normalizes state, done and rollover mode together", () => {
+    expect(normalizeTask({ id: "task-1", category: "gym", done: false }, "2026-03-11")).toEqual(
+      expect.objectContaining({
+        state: "open",
+        done: false,
+        rolloverMode: "anchor",
+        scheduledDate: "2026-03-11",
+      })
+    );
+  });
+
+  it("resets subtasks to pending", () => {
+    expect(resetSubtasks([{ id: "sub-1", text: "Paso", done: true }])).toEqual([
+      { id: "sub-1", text: "Paso", done: false },
+    ]);
+  });
+
+  it("labels carry-over tasks from yesterday", () => {
+    expect(getScheduledDateBadge("2026-03-10", "2026-03-11")).toBe("De ayer");
+  });
+
+  it("labels carry-over tasks from older dates", () => {
+    expect(getScheduledDateBadge("2026-03-08", "2026-03-11")).toBe("Del 8 mar");
   });
 });

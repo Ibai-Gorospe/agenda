@@ -1,7 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { T } from "../theme";
 import { CATEGORIES, PRIORITY_OPTIONS, GYM_ID } from "../constants";
-import { isWeekend, formatDateLabel, genId, recurrenceToDays, daysToRecurrence } from "../helpers";
+import {
+  isWeekend,
+  formatDateLabel,
+  genId,
+  recurrenceToDays,
+  daysToRecurrence,
+  getTaskRolloverMode,
+  isTaskDone,
+  getTaskState,
+} from "../helpers";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { X, Dumbbell, Check, Plus } from "lucide-react";
 
@@ -13,6 +22,8 @@ export default function TaskModal({ date, task, onSave, onClose }) {
   const [selectedDays, setSelectedDays] = useState(() => new Set(recurrenceToDays(task?.recurrence || "", date)));
   const [isMonthly, setIsMonthly] = useState(task?.recurrence === "monthly");
   const [priority, setPriority] = useState(task?.priority || null);
+  const [rolloverMode, setRolloverMode] = useState(() => getTaskRolloverMode(task || { category: task?.category || null }));
+  const [rolloverTouched, setRolloverTouched] = useState(false);
   const [notes, setNotes] = useState(task?.notes || "");
   const [showNotes, setShowNotes] = useState(!!task?.notes);
   const [subtasks, setSubtasks] = useState(task?.subtasks || []);
@@ -29,6 +40,11 @@ export default function TaskModal({ date, task, onSave, onClose }) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  useEffect(() => {
+    if (task?.id || rolloverTouched) return;
+    setRolloverMode(category === GYM_ID ? "anchor" : "carry");
+  }, [category, rolloverTouched, task]);
 
   const toggleDay = (dayNum) => {
     setSelectedDays(prev => {
@@ -47,6 +63,7 @@ export default function TaskModal({ date, task, onSave, onClose }) {
   const save = () => {
     if (!text.trim()) return;
     const recurrence = isMonthly ? "monthly" : daysToRecurrence([...selectedDays]);
+    const id = task?.id || genId();
     onSave({
       ...task,
       text: text.trim(), time, reminder,
@@ -54,9 +71,13 @@ export default function TaskModal({ date, task, onSave, onClose }) {
       priority: priority || null,
       notes: notes.trim() || null,
       subtasks,
-      done: task?.done || false,
+      rolloverMode,
+      state: task?.id ? getTaskState(task) : "open",
+      done: task?.id ? isTaskDone(task) : false,
       position: task?.position ?? 0,
-      id: task?.id || genId(),
+      id,
+      seriesId: task?.seriesId || id,
+      scheduledDate: task?.scheduledDate || date,
     });
     onClose();
   };
@@ -209,6 +230,29 @@ export default function TaskModal({ date, task, onSave, onClose }) {
             border: `1.5px solid ${isMonthly ? (weekend ? T.weekend : T.accent) : T.borderGray}`,
             color: isMonthly ? (weekend ? T.weekend : T.accent) : T.textMuted,
           }}>Cada mes</button>
+        </div>
+
+        <div style={{ marginBottom: "1rem" }}>
+          <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600,
+            color: T.textSub, marginBottom: ".4rem" }}>Si no se hace</label>
+          <div style={{ display: "flex", gap: ".4rem" }}>
+            {[
+              { value: "carry", label: "Arrastrar a hoy" },
+              { value: "anchor", label: "Dejar en su dia" },
+            ].map(option => (
+              <button key={option.value} onClick={() => {
+                setRolloverTouched(true);
+                setRolloverMode(option.value);
+              }} style={{
+                flex: 1,
+                padding: ".55rem .7rem", borderRadius: "14px", fontSize: ".78rem", fontWeight: 600,
+                cursor: "pointer", transition: "all .15s",
+                background: rolloverMode === option.value ? T.accentLight : "transparent",
+                border: `1.5px solid ${rolloverMode === option.value ? T.accent : T.borderGray}`,
+                color: rolloverMode === option.value ? T.accentDark : T.textMuted,
+              }}>{option.label}</button>
+            ))}
+          </div>
         </div>
 
         {/* Notes */}

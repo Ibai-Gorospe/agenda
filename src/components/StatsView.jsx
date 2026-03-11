@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { T } from "../theme";
 import { X } from "lucide-react";
 import { CATEGORIES } from "../constants";
-import { getWeekStart, pad } from "../helpers";
+import { getWeekStart, isTaskDone, isTaskOpen, pad } from "../helpers";
 
 export default function StatsView({ tasks, today, onClose }) {
   const stats = useMemo(() => {
@@ -20,8 +20,8 @@ export default function StatsView({ tasks, today, onClose }) {
     const weekStartStr = fmt(weekStart);
     const lastWeekStartStr = fmt(lastWeekStart);
 
-    const thisWeekDone = allTasks.filter(t => t.done && t.date >= weekStartStr && t.date <= today).length;
-    const lastWeekDone = allTasks.filter(t => t.done && t.date >= lastWeekStartStr && t.date < weekStartStr).length;
+    const thisWeekDone = allTasks.filter(t => isTaskDone(t) && t.date >= weekStartStr && t.date <= today).length;
+    const lastWeekDone = allTasks.filter(t => isTaskDone(t) && t.date >= lastWeekStartStr && t.date < weekStartStr).length;
 
     // Completion rate by category
     const byCat = {};
@@ -30,14 +30,14 @@ export default function StatsView({ tasks, today, onClose }) {
     allTasks.forEach(t => {
       const key = t.category || "none";
       if (byCat[key]) {
-        byCat[key].total++;
-        if (t.done) byCat[key].done++;
+        if (isTaskOpen(t) || isTaskDone(t)) byCat[key].total++;
+        if (isTaskDone(t)) byCat[key].done++;
       }
     });
 
     // Best day of week
     const dayBuckets = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
-    allTasks.filter(t => t.done).forEach(t => {
+    allTasks.filter(isTaskDone).forEach(t => {
       const d = new Date(t.date + "T12:00:00").getDay();
       const idx = (d + 6) % 7; // Convert to Mon=0
       dayBuckets[idx]++;
@@ -51,13 +51,13 @@ export default function StatsView({ tasks, today, onClose }) {
       while (true) {
         const ds = fmt(d);
         const dayTasks = tasks[ds] || [];
-        if (dayTasks.some(t => t.done)) { completionStreak++; d.setDate(d.getDate() - 1); } else break;
+        if (dayTasks.some(isTaskDone)) { completionStreak++; d.setDate(d.getDate() - 1); } else break;
       }
     }
 
     // Total stats
-    const totalDone = allTasks.filter(t => t.done).length;
-    const totalPending = allTasks.filter(t => !t.done).length;
+    const totalDone = allTasks.filter(isTaskDone).length;
+    const totalPending = allTasks.filter(isTaskOpen).length;
 
     return { thisWeekDone, lastWeekDone, byCat, bestDayIdx, dayNames, completionStreak, totalDone, totalPending, dayBuckets };
   }, [tasks, today]);

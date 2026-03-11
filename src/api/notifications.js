@@ -1,6 +1,7 @@
 export const supportsNotif = typeof window !== "undefined" && "Notification" in window;
 
 export function scheduleNotification(task, dateStr) {
+  if (task?.state === "skipped" || task?.done) return;
   if (!task.time || !task.reminder || task.reminder === "0" || !supportsNotif) return;
   if (Notification.permission !== "granted") return;
   const [h, m] = task.time.split(":").map(Number);

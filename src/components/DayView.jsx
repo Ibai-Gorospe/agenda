@@ -3,7 +3,7 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor, 
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { T } from "../theme";
 import { CATEGORIES, GYM_ID } from "../constants";
-import { todayStr, formatDateLabel, isWeekend } from "../helpers";
+import { todayStr, formatDateLabel, isWeekend, isTaskDone, isTaskOpen, isTaskSkipped } from "../helpers";
 import { Dumbbell, Plus, Sparkles, Sun, SearchX } from "lucide-react";
 import SortableTask from "./SortableTask";
 import SortableWorkoutTask from "./SortableWorkoutTask";
@@ -11,7 +11,7 @@ import CompletedDivider from "./CompletedDivider";
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
-function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDelete, onMoveTask, onReorder, onDuplicate,
+function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDelete, onMoveTask, onReorder, onToggleSubtask, onDuplicate,
                    pendingPastCount, onMovePendingToToday, onDismissPending, onSelectPending, showPendingBanner,
                    activeCategory, onSetActiveCategory, highlightedTaskId }) {
 
@@ -30,10 +30,12 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
   const regularTasks = allDayTasks.filter(t => t.category !== GYM_ID);
 
   // Split into pending/done (unfiltered — used by DnD handlers)
-  const pendingWorkout = workoutTasks.filter(t => !t.done);
-  const doneWorkout = workoutTasks.filter(t => t.done);
-  const pendingRegular = regularTasks.filter(t => !t.done);
-  const doneRegular = regularTasks.filter(t => t.done);
+  const openWorkout = workoutTasks.filter(isTaskOpen);
+  const doneWorkout = workoutTasks.filter(isTaskDone);
+  const skippedWorkout = workoutTasks.filter(isTaskSkipped);
+  const openRegular = regularTasks.filter(isTaskOpen);
+  const doneRegular = regularTasks.filter(isTaskDone);
+  const skippedRegular = regularTasks.filter(isTaskSkipped);
 
   // Apply category filter
   const displayWorkout = activeCategory
@@ -44,10 +46,12 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
     : regularTasks;
 
   // Split filtered into pending/done (for display)
-  const displayPendingWorkout = displayWorkout.filter(t => !t.done);
-  const displayDoneWorkout = displayWorkout.filter(t => t.done);
-  const displayPendingRegular = displayRegular.filter(t => !t.done);
-  const displayDoneRegular = displayRegular.filter(t => t.done);
+  const displayOpenWorkout = displayWorkout.filter(isTaskOpen);
+  const displayDoneWorkout = displayWorkout.filter(isTaskDone);
+  const displaySkippedWorkout = displayWorkout.filter(isTaskSkipped);
+  const displayOpenRegular = displayRegular.filter(isTaskOpen);
+  const displayDoneRegular = displayRegular.filter(isTaskDone);
+  const displaySkippedRegular = displayRegular.filter(isTaskSkipped);
 
   // Apply priority sorting when enabled
   const sortByPriorityFn = (a, b) => {
@@ -55,21 +59,22 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
     const pb = PRIORITY_RANK[b.priority] ?? 3;
     return pa !== pb ? pa - pb : (a.position ?? 0) - (b.position ?? 0);
   };
-  const sortedPendingWorkout = sortByPriority
-    ? [...displayPendingWorkout].sort(sortByPriorityFn)
-    : displayPendingWorkout;
-  const sortedPendingRegular = sortByPriority
-    ? [...displayPendingRegular].sort(sortByPriorityFn)
-    : displayPendingRegular;
+  const sortedOpenWorkout = sortByPriority
+    ? [...displayOpenWorkout].sort(sortByPriorityFn)
+    : displayOpenWorkout;
+  const sortedOpenRegular = sortByPriority
+    ? [...displayOpenRegular].sort(sortByPriorityFn)
+    : displayOpenRegular;
 
   // Combined arrays for SortableContext (pending first, done last)
-  const allDisplayWorkout = [...sortedPendingWorkout, ...displayDoneWorkout];
-  const allDisplayRegular = [...sortedPendingRegular, ...displayDoneRegular];
+  const allDisplayWorkout = [...sortedOpenWorkout, ...displayDoneWorkout, ...displaySkippedWorkout];
+  const allDisplayRegular = [...sortedOpenRegular, ...displayDoneRegular, ...displaySkippedRegular];
 
   const isToday = date === todayStr();
   const weekend = isWeekend(date);
-  const pendingCount = allDayTasks.filter(t => !t.done).length;
-  const doneCount = allDayTasks.filter(t => t.done).length;
+  const pendingCount = allDayTasks.filter(isTaskOpen).length;
+  const doneCount = allDayTasks.filter(isTaskDone).length;
+  const skippedCount = allDayTasks.filter(isTaskSkipped).length;
 
   const uniqueCategories = [...new Set(allDayTasks.map(t => t.category).filter(Boolean))];
 
@@ -81,24 +86,24 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
 
   const handleWorkoutDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return;
-    const oldIdx = pendingWorkout.findIndex(t => t.id === active.id);
-    const newIdx = pendingWorkout.findIndex(t => t.id === over.id);
+    const oldIdx = openWorkout.findIndex(t => t.id === active.id);
+    const newIdx = openWorkout.findIndex(t => t.id === over.id);
     if (oldIdx === -1 || newIdx === -1) return;
-    onReorder(date, [...arrayMove(pendingWorkout, oldIdx, newIdx), ...doneWorkout, ...pendingRegular, ...doneRegular]);
+    onReorder(date, [...arrayMove(openWorkout, oldIdx, newIdx), ...doneWorkout, ...skippedWorkout, ...openRegular, ...doneRegular, ...skippedRegular]);
   };
 
   const handleRegularDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return;
-    const oldIdx = pendingRegular.findIndex(t => t.id === active.id);
-    const newIdx = pendingRegular.findIndex(t => t.id === over.id);
+    const oldIdx = openRegular.findIndex(t => t.id === active.id);
+    const newIdx = openRegular.findIndex(t => t.id === over.id);
     if (oldIdx === -1 || newIdx === -1) return;
-    onReorder(date, [...pendingWorkout, ...doneWorkout, ...arrayMove(pendingRegular, oldIdx, newIdx), ...doneRegular]);
+    onReorder(date, [...openWorkout, ...doneWorkout, ...skippedWorkout, ...arrayMove(openRegular, oldIdx, newIdx), ...doneRegular, ...skippedRegular]);
   };
 
   // Workout section stats
   const workoutExercisesTotal = displayWorkout.reduce((sum, t) => sum + (t.subtasks || []).length, 0);
   const workoutExercisesDone = displayWorkout.reduce((sum, t) => sum + (t.subtasks || []).filter(s => s.done).length, 0);
-  const workoutsDone = displayWorkout.filter(t => t.done).length;
+  const workoutsDone = displayWorkout.filter(isTaskDone).length;
 
   return (
     <div style={{ padding: "1.25rem 1rem 2rem", maxWidth: "600px", margin: "0 auto" }}>
@@ -139,6 +144,7 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
             <div style={{ textAlign: "right" }}>
               {pendingCount > 0 && <div style={{ color: "rgba(255,255,255,.9)", fontSize: ".82rem", fontWeight: 600 }}>{pendingCount} pendiente{pendingCount > 1 ? "s" : ""}</div>}
               {doneCount > 0 && <div style={{ color: "rgba(255,255,255,.65)", fontSize: ".78rem" }}>{doneCount} completada{doneCount > 1 ? "s" : ""}</div>}
+              {skippedCount > 0 && <div style={{ color: "rgba(255,255,255,.58)", fontSize: ".76rem" }}>{skippedCount} omitida{skippedCount > 1 ? "s" : ""}</div>}
             </div>
           )}
         </div>
@@ -259,9 +265,10 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleWorkoutDragEnd}>
             <SortableContext items={allDisplayWorkout.map(t => t.id)} strategy={verticalListSortingStrategy}>
               <div style={{ display: "flex", flexDirection: "column", gap: ".65rem" }}>
-                {sortedPendingWorkout.map(task => (
+                {sortedOpenWorkout.map(task => (
                   <SortableWorkoutTask key={task.id} task={task} date={date}
                     onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                    onToggleSubtask={onToggleSubtask}
                     onMoveTask={onMoveTask} onDuplicate={onDuplicate}
                     highlightedTaskId={highlightedTaskId}
                     hideDragHandle={sortByPriority} />
@@ -274,6 +281,21 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
                     {displayDoneWorkout.map(task => (
                       <SortableWorkoutTask key={task.id} task={task} date={date}
                         onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                        onToggleSubtask={onToggleSubtask}
+                        onMoveTask={onMoveTask} onDuplicate={onDuplicate}
+                        highlightedTaskId={highlightedTaskId} />
+                    ))}
+                  </div>
+                </>
+              )}
+              {displaySkippedWorkout.length > 0 && (
+                <>
+                  <CompletedDivider count={displaySkippedWorkout.length} label="Omitidas" />
+                  <div style={{ display: "flex", flexDirection: "column", gap: ".65rem" }}>
+                    {displaySkippedWorkout.map(task => (
+                      <SortableWorkoutTask key={task.id} task={task} date={date}
+                        onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                        onToggleSubtask={onToggleSubtask}
                         onMoveTask={onMoveTask} onDuplicate={onDuplicate}
                         highlightedTaskId={highlightedTaskId} />
                     ))}
@@ -310,10 +332,11 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
       {/* Regular task list */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRegularDragEnd}>
         <SortableContext items={allDisplayRegular.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          <div style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: displayDoneRegular.length > 0 ? "0" : "1rem" }}>
-            {sortedPendingRegular.map(task => (
+          <div style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: (displayDoneRegular.length > 0 || displaySkippedRegular.length > 0) ? "0" : "1rem" }}>
+            {sortedOpenRegular.map(task => (
               <SortableTask key={task.id} task={task} date={date} weekend={weekend}
                 onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                onToggleSubtask={onToggleSubtask}
                 onMoveTask={onMoveTask} onDuplicate={onDuplicate}
                 highlightedTaskId={highlightedTaskId}
                 hideDragHandle={sortByPriority} />
@@ -326,6 +349,21 @@ function DayView({ date, tasks, onAddTask, onAddWorkout, onToggle, onEdit, onDel
                 {displayDoneRegular.map(task => (
                   <SortableTask key={task.id} task={task} date={date} weekend={weekend}
                     onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                    onToggleSubtask={onToggleSubtask}
+                    onMoveTask={onMoveTask} onDuplicate={onDuplicate}
+                    highlightedTaskId={highlightedTaskId} />
+                ))}
+              </div>
+            </>
+          )}
+          {displaySkippedRegular.length > 0 && (
+            <>
+              <CompletedDivider count={displaySkippedRegular.length} label="Omitidas" />
+              <div style={{ display: "flex", flexDirection: "column", gap: ".65rem", marginBottom: "1rem" }}>
+                {displaySkippedRegular.map(task => (
+                  <SortableTask key={task.id} task={task} date={date} weekend={weekend}
+                    onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}
+                    onToggleSubtask={onToggleSubtask}
                     onMoveTask={onMoveTask} onDuplicate={onDuplicate}
                     highlightedTaskId={highlightedTaskId} />
                 ))}

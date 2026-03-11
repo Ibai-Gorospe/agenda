@@ -37,6 +37,7 @@ Agenda esta pensada para uso diario desde movil o escritorio:
 - Prioridades `high`, `medium`, `low`
 - Categorias predefinidas: personal, trabajo, salud, estudio, hogar y gym
 - Subtareas y notas
+- Checklist expandible en tarjeta con marcado inline de subtareas
 - Filtro por categoria en vista diaria
 - Busqueda global con `Ctrl + K`
 
@@ -47,6 +48,10 @@ Agenda esta pensada para uso diario desde movil o escritorio:
 - Dias personalizados
 - Mensual
 - Creacion automatica de la siguiente ocurrencia al completar
+- Materializacion automatica de la ocurrencia de hoy aunque la de ayer siga pendiente
+- Las tareas atrasadas movidas a hoy conservan su fecha prevista original
+- Politica por tarea para decidir si una recurrencia perdida se arrastra o queda anclada a su fecha
+- Estados de ocurrencia `open`, `done` y `skipped`
 
 ### Navegacion y vistas
 
@@ -110,11 +115,15 @@ Ejecuta estos scripts en el SQL Editor de Supabase, en este orden:
    Crea la tabla `tasks` y activa RLS.
 2. `supabase_migration.sql`
    Anade la columna `position` y recalcula el orden inicial.
-3. `supabase_weight_logs.sql`
+3. `supabase_recurring_instances.sql`
+   Anade `series_id` y `scheduled_date` para distinguir instancias recurrentes atrasadas de la tarea del dia actual.
+4. `supabase_task_state_rollover.sql`
+   Anade `state` y `rollover_mode` para separar tareas abiertas, hechas y omitidas, y definir si una recurrencia se arrastra o queda anclada.
+5. `supabase_weight_logs.sql`
    Crea `weight_logs`.
-4. `supabase_user_settings.sql`
+6. `supabase_user_settings.sql`
    Crea `user_settings` para el objetivo de peso.
-5. `supabase_email_notifications.sql`
+7. `supabase_email_notifications.sql`
    Crea `email_notification_log` para evitar duplicados en emails.
 
 ### 4. Desarrollo local
@@ -159,7 +168,7 @@ Se apoya en estas variables de entorno dentro de Supabase:
 La funcion:
 
 - Busca tareas pendientes con recordatorio activo
-- Resuelve recurrencias para hoy y para avisos de 1 dia antes
+- Resuelve recurrencias para hoy y para avisos de 1 dia antes sin duplicar instancias de una misma serie
 - Evita duplicados usando `email_notification_log`
 - Envia emails via Resend
 

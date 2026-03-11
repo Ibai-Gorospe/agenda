@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { T } from "../theme";
 import { MONTHS_ES } from "../constants";
-import { pad } from "../helpers";
+import { pad, isTaskDone, isTaskOpen } from "../helpers";
 import Badge from "./Badge";
 
 function YearView({ year, tasks, onSelectMonth, today }) {
@@ -11,7 +11,10 @@ function YearView({ year, tasks, onSelectMonth, today }) {
       let pending = 0, done = 0;
       Object.entries(tasks).forEach(([k, ts]) => {
         if (k.startsWith(prefix)) {
-          ts.forEach(t => { if (t.done) done++; else pending++; });
+          ts.forEach(t => {
+            if (isTaskDone(t)) done++;
+            else if (isTaskOpen(t)) pending++;
+          });
         }
       });
       return { pending, done };

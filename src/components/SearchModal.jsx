@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { T } from "../theme";
-import { formatDateLabel } from "../helpers";
+import { formatDateLabel, isTaskDone, isTaskOpen, isTaskSkipped } from "../helpers";
 import { UI } from "../constants";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { Search } from "lucide-react";
@@ -96,17 +96,18 @@ export default function SearchModal({ tasks, onSelectTask, onClose }) {
               }}>
               <span style={{
                 width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                background: task.done ? T.textMuted : T.accent,
+                background: isTaskOpen(task) ? T.accent : T.textMuted,
               }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{
-                  margin: 0, fontSize: ".88rem", color: task.done ? T.textMuted : T.text,
-                  textDecoration: task.done ? "line-through" : "none",
+                  margin: 0, fontSize: ".88rem", color: isTaskOpen(task) ? T.text : T.textMuted,
+                  textDecoration: isTaskDone(task) ? "line-through" : "none",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}>{task.text}</p>
                 <p style={{ margin: 0, fontSize: ".72rem", color: T.textMuted }}>
                   {formatDateLabel(date).split(",").slice(0, 2).join(",")}
                   {task.time ? ` · ${task.time}` : ""}
+                  {isTaskSkipped(task) ? " · omitida" : ""}
                 </p>
               </div>
             </button>

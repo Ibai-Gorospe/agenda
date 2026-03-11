@@ -8,6 +8,16 @@ create table tasks (
   time text,
   reminder text default '0',
   done boolean default false,
+  position integer default 0,
+  category text,
+  recurrence text,
+  priority text,
+  notes text,
+  subtasks jsonb default '[]'::jsonb,
+  rollover_mode text default 'carry',
+  state text default 'open',
+  series_id text not null,
+  scheduled_date text not null,
   created_at timestamp with time zone default now()
 );
 

@@ -1,4 +1,4 @@
-import { MONTHS_SHORT } from "./constants";
+import { GYM_ID, MONTHS_SHORT } from "./constants";
 
 export const pad = (n) => String(n).padStart(2, "0");
 
@@ -13,6 +13,35 @@ export const formatDateLabel = (dateStr) => {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 };
+
+export const getTaskSeriesId = (task) => task?.seriesId || task?.id || null;
+
+export const getTaskScheduledDate = (task, fallbackDate = "") => task?.scheduledDate || fallbackDate;
+
+export const getTaskState = (task) => {
+  if (task?.state === "done" || task?.state === "open" || task?.state === "skipped") return task.state;
+  return task?.done ? "done" : "open";
+};
+
+export const isTaskOpen = (task) => getTaskState(task) === "open";
+
+export const isTaskDone = (task) => getTaskState(task) === "done";
+
+export const isTaskSkipped = (task) => getTaskState(task) === "skipped";
+
+export const getTaskRolloverMode = (task) => {
+  if (task?.rolloverMode === "carry" || task?.rolloverMode === "anchor") return task.rolloverMode;
+  return task?.category === GYM_ID ? "anchor" : "carry";
+};
+
+export const normalizeTask = (task, fallbackDate = "") => ({
+  ...task,
+  state: getTaskState(task),
+  done: isTaskDone(task),
+  rolloverMode: getTaskRolloverMode(task),
+  seriesId: getTaskSeriesId(task),
+  scheduledDate: getTaskScheduledDate(task, fallbackDate),
+});
 
 export const isWeekend = (dateStr) => {
   const d = new Date(dateStr + "T12:00:00").getDay();
@@ -126,4 +155,21 @@ export const dateAdd = (dateStr, days) => {
   const d = new Date(dateStr + "T12:00:00");
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+export const resetSubtasks = (subtasks = []) => subtasks.map(s => ({ ...s, done: false }));
+
+const formatShortDate = (dateStr) => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+  }).replace(".", "");
+};
+
+export const getScheduledDateBadge = (scheduledDate, visibleDate) => {
+  if (!scheduledDate || !visibleDate || scheduledDate === visibleDate) return null;
+  if (scheduledDate === dateAdd(visibleDate, -1)) return "De ayer";
+  if (scheduledDate === dateAdd(visibleDate, 1)) return "De manana";
+  return `Del ${formatShortDate(scheduledDate)}`;
 };

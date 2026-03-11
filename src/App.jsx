@@ -57,7 +57,7 @@ export default function App() {
     dismissedPendingBanner, setDismissedPendingBanner,
     showPendingSelector, setShowPendingSelector,
     persistTask, handleToggle, handleDelete, handleDuplicate,
-    moveTask, handleReorder,
+    moveTask, handleReorder, toggleSubtask,
     pendingPastCount, pendingPastTasks,
     moveAllPendingToToday, moveSelectedPendingToToday,
   } = useTaskManager(user, addToast);
@@ -310,6 +310,7 @@ export default function App() {
               onDelete={handleDelete}
               onMoveTask={(date, task) => setMovePicker({ date, task })}
               onReorder={handleReorder}
+              onToggleSubtask={toggleSubtask}
               onDuplicate={handleDuplicate}
               pendingPastCount={pendingPastCount}
               onMovePendingToToday={moveAllPendingToToday}

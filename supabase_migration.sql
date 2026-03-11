@@ -1,7 +1,7 @@
 -- Ejecuta esto en el SQL Editor de Supabase (una sola vez)
 -- Migracion: Añadir columna position para reordenar tareas
 
-ALTER TABLE tasks ADD COLUMN position integer DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS position integer DEFAULT 0;
 
 -- Rellenar posiciones existentes segun el orden actual (por hora)
 WITH ranked AS (
