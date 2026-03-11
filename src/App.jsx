@@ -9,6 +9,7 @@ import { useAuth } from "./hooks/useAuth";
 import { useNavigation } from "./hooks/useNavigation";
 import { useTaskManager } from "./hooks/useTaskManager";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { TASK_DELETE_MODES } from "./taskDeletion";
 
 import ToastContainer from "./components/ToastContainer";
 import LoginScreen from "./components/LoginScreen";
@@ -23,6 +24,7 @@ const WeightView = lazy(() => import("./components/WeightView"));
 const SearchModal = lazy(() => import("./components/SearchModal"));
 const TaskModal = lazy(() => import("./components/TaskModal"));
 const MoveTaskPicker = lazy(() => import("./components/MoveTaskPicker"));
+const RecurringDeleteModal = lazy(() => import("./components/RecurringDeleteModal"));
 const StatsView = lazy(() => import("./components/StatsView"));
 const PendingTasksSelector = lazy(() => import("./components/PendingTasksSelector"));
 
@@ -67,6 +69,7 @@ export default function App() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
+  const [recurringDeleteTarget, setRecurringDeleteTarget] = useState(null);
 
   // Inject global CSS once
   useEffect(() => {
@@ -111,6 +114,16 @@ export default function App() {
   );
 
   if (!user) return <LoginScreen onLogin={setUser} />;
+
+  const requestDelete = (date, id) => {
+    const task = (tasks[date] || []).find(entry => entry.id === id);
+    if (!task) return;
+    if (!task.recurrence) {
+      handleDelete(date, id);
+      return;
+    }
+    setRecurringDeleteTarget({ date, task });
+  };
 
   const activeIdx = navItems.findIndex(n => n.key === activeView);
 
@@ -307,7 +320,7 @@ export default function App() {
               onAddWorkout={() => setModal({ date: selectedDate, task: { category: "gym" } })}
               onToggle={handleToggle}
               onEdit={(date, task) => setModal({ date, task })}
-              onDelete={handleDelete}
+              onDelete={requestDelete}
               onMoveTask={(date, task) => setMovePicker({ date, task })}
               onReorder={handleReorder}
               onToggleSubtask={toggleSubtask}
@@ -403,6 +416,16 @@ export default function App() {
             currentDate={movePicker.date}
             onMove={(toDate) => moveTask(movePicker.date, toDate, movePicker.task.id)}
             onClose={() => setMovePicker(null)} />
+        )}
+        {recurringDeleteTarget && (
+          <RecurringDeleteModal
+            date={recurringDeleteTarget.date}
+            task={recurringDeleteTarget.task}
+            onSelect={(mode) => {
+              handleDelete(recurringDeleteTarget.date, recurringDeleteTarget.task.id, mode || TASK_DELETE_MODES.SINGLE);
+              setRecurringDeleteTarget(null);
+            }}
+            onClose={() => setRecurringDeleteTarget(null)} />
         )}
         {searchOpen && (
           <SearchModal

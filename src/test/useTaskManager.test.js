@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useTaskManager } from "../hooks/useTaskManager";
 import { TIMINGS } from "../constants";
+import { TASK_DELETE_MODES } from "../taskDeletion";
 
 const mockFetchTasks = vi.fn();
 const mockUpsertTask = vi.fn();
@@ -135,6 +136,11 @@ describe("useTaskManager", () => {
     await act(async () => {
       await result.current.handleReorder("2026-03-11", reordered);
     });
+
+    expect(result.current.tasks["2026-03-11"]).toMatchObject([
+      { id: "task-2", text: "Segundo", done: false, position: 0 },
+      { id: "task-1", text: "Primero", done: false, position: 1 },
+    ]);
 
     expect(mockEnqueueMany).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -310,6 +316,220 @@ describe("useTaskManager", () => {
     });
 
     expect(result.current.tasks["2026-03-12"]).toBeUndefined();
+  });
+
+  it("does not recreate a deleted recurring occurrence", async () => {
+    const { result } = await renderTaskManager();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-11T12:00:00"));
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-10": [{
+          id: "task-1",
+          text: "Pastilla",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-10",
+        }],
+        "2026-03-11": [{
+          id: "task-2",
+          text: "Pastilla",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-11",
+        }],
+      });
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    act(() => {
+      result.current.handleDelete("2026-03-10", "task-1");
+      vi.advanceTimersByTime(TIMINGS.UNDO_WINDOW);
+    });
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.tasks["2026-03-10"]).toEqual([]);
+    expect(result.current.tasks["2026-03-11"][0]).toEqual(expect.objectContaining({
+      id: "task-2",
+      deletedDates: ["2026-03-10"],
+    }));
+    expect(mockEnqueueMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        type: "upsert",
+        date: "2026-03-11",
+        task: expect.objectContaining({
+          id: "task-2",
+          deletedDates: ["2026-03-10"],
+        }),
+      }),
+      expect.objectContaining({ type: "delete", id: "task-1" }),
+    ]);
+  });
+
+  it("keeps a single recurring deletion alive by creating the next occurrence", async () => {
+    const { result } = await renderTaskManager();
+    vi.useFakeTimers();
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-11": [{
+          id: "task-1",
+          text: "Creatina",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-11",
+        }],
+      });
+    });
+
+    act(() => {
+      result.current.handleDelete("2026-03-11", "task-1");
+    });
+
+    expect(result.current.tasks["2026-03-11"]).toEqual([]);
+    expect(result.current.tasks["2026-03-12"][0]).toEqual(expect.objectContaining({
+      recurrence: "daily",
+      scheduledDate: "2026-03-12",
+      deletedDates: ["2026-03-11"],
+    }));
+
+    act(() => {
+      vi.advanceTimersByTime(TIMINGS.UNDO_WINDOW);
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(mockEnqueueMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        type: "upsert",
+        date: "2026-03-12",
+        task: expect.objectContaining({
+          recurrence: "daily",
+          scheduledDate: "2026-03-12",
+          deletedDates: ["2026-03-11"],
+        }),
+      }),
+      expect.objectContaining({ type: "delete", id: "task-1" }),
+    ]);
+  });
+
+  it("deletes this and following recurring occurrences without removing earlier history", async () => {
+    const { result } = await renderTaskManager();
+    vi.useFakeTimers();
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-10": [{
+          id: "task-1",
+          text: "Gym",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-10",
+        }],
+        "2026-03-11": [{
+          id: "task-2",
+          text: "Gym",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-11",
+        }],
+        "2026-03-12": [{
+          id: "task-3",
+          text: "Gym",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-12",
+        }],
+      });
+    });
+
+    act(() => {
+      result.current.handleDelete("2026-03-11", "task-2", TASK_DELETE_MODES.FUTURE);
+    });
+
+    expect(result.current.tasks["2026-03-10"][0]).toEqual(expect.objectContaining({
+      id: "task-1",
+      recurrence: null,
+    }));
+    expect(result.current.tasks["2026-03-11"]).toEqual([]);
+    expect(result.current.tasks["2026-03-12"]).toEqual([]);
+
+    act(() => {
+      vi.advanceTimersByTime(TIMINGS.UNDO_WINDOW);
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(mockEnqueueMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        type: "upsert",
+        date: "2026-03-10",
+        task: expect.objectContaining({ id: "task-1", recurrence: null }),
+      }),
+      expect.objectContaining({ type: "delete", id: "task-2" }),
+      expect.objectContaining({ type: "delete", id: "task-3" }),
+    ]);
+  });
+
+  it("deletes the whole recurring series when requested", async () => {
+    const { result } = await renderTaskManager();
+    vi.useFakeTimers();
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-10": [{
+          id: "task-1",
+          text: "Magnesio",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-10",
+        }],
+        "2026-03-11": [{
+          id: "task-2",
+          text: "Magnesio",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-11",
+        }],
+        "2026-03-13": [{ id: "other", text: "Otra", done: false, position: 0 }],
+      });
+    });
+
+    act(() => {
+      result.current.handleDelete("2026-03-11", "task-2", TASK_DELETE_MODES.ALL);
+    });
+
+    expect(result.current.tasks["2026-03-10"]).toEqual([]);
+    expect(result.current.tasks["2026-03-11"]).toEqual([]);
+    expect(result.current.tasks["2026-03-13"]).toEqual([
+      expect.objectContaining({ id: "other" }),
+    ]);
+
+    act(() => {
+      vi.advanceTimersByTime(TIMINGS.UNDO_WINDOW);
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(mockEnqueueMany).toHaveBeenCalledWith([
+      expect.objectContaining({ type: "delete", id: "task-1" }),
+      expect.objectContaining({ type: "delete", id: "task-2" }),
+    ]);
   });
 
   it("toggles subtasks inline and persists the task update", async () => {

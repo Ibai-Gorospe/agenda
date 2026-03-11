@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import WeightView from "../components/WeightView";
 
@@ -28,6 +28,10 @@ describe("WeightView", () => {
     mockUpsertWeightLog.mockResolvedValue({ id: "log-1", date: "2026-03-11", weight_kg: 80 });
     mockUpsertWeightGoal.mockResolvedValue(undefined);
     mockDeleteWeightLog.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows an error instead of staying in loading state when load fails", async () => {
@@ -65,5 +69,19 @@ describe("WeightView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar eliminacion del registro 2026-03-11" }));
 
     await waitFor(() => expect(mockDeleteWeightLog).toHaveBeenCalledWith("log-1"));
+  });
+
+  it("anchors derived stats to the provided today prop instead of the system clock", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-15T12:00:00"));
+    mockFetchWeightLogs.mockResolvedValueOnce([
+      { id: "log-1", date: "2026-03-09", weight_kg: 80 },
+      { id: "log-2", date: "2026-03-10", weight_kg: 79.8 },
+      { id: "log-3", date: "2026-03-11", weight_kg: 79.6 },
+    ]);
+
+    render(<WeightView user={{ id: "user-1" }} today="2026-03-11" onCreateAccount={vi.fn()} />);
+
+    expect(await screen.findByText(/^3$/)).toBeInTheDocument();
   });
 });

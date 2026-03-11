@@ -5,6 +5,7 @@ import {
   genId,
   formatDateLabel,
   normalizeTask,
+  getTaskDeletedDates,
   getTaskSeriesId,
   getTaskScheduledDate,
   getTaskRolloverMode,
@@ -18,15 +19,15 @@ import { TIMINGS } from "../constants";
 import { fetchTasks, upsertTask, deleteTaskDB, batchUpsertPositions } from "../api/tasks";
 import { supportsNotif, scheduleNotification } from "../api/notifications";
 import { useOfflineQueue } from "./useOfflineQueue";
+import { replaceTaskById, upsertTaskById } from "../taskCollections";
+import { buildTaskDeletePlan, getTaskDeleteToastMessage, TASK_DELETE_MODES } from "../taskDeletion";
+import { assignOrderedTaskPositions, getNextTaskPosition, replaceTasksForDate } from "../taskOrdering";
+import { withToggledSubtask } from "../taskSubtasks";
 
 const byPosition = (a, b) => (a.position ?? 0) - (b.position ?? 0);
 const asQueueOps = (ops) => (Array.isArray(ops) ? ops : [ops]).filter(Boolean);
 const upsertQueueOp = (date, task) => ({ type: "upsert", date, task });
 const deleteQueueOp = (id) => ({ type: "delete", id });
-const getNextPosition = (dayTasks = []) => {
-  if (!dayTasks.length) return 0;
-  return Math.max(...dayTasks.map(t => t.position ?? 0)) + 1;
-};
 
 const normalizeTaskMap = (taskMap) => Object.fromEntries(
   Object.entries(taskMap).map(([date, dayTasks]) => [
@@ -40,6 +41,10 @@ const compareSeriesEntries = (a, b) => {
   if (a.displayDate !== b.displayDate) return a.displayDate.localeCompare(b.displayDate);
   return (a.task.position ?? 0) - (b.task.position ?? 0);
 };
+
+const mergeDeletedDates = (...deletedDateLists) => (
+  [...new Set(deletedDateLists.flat().filter(Boolean))].sort()
+);
 
 const getSeriesEntries = (taskMap) => {
   const entries = [];
@@ -59,6 +64,17 @@ const getSeriesEntries = (taskMap) => {
   return entries;
 };
 
+const getSeriesDeletedDates = (taskMap, seriesId) => {
+  const deletedDates = new Set();
+  getSeriesEntries(taskMap).forEach(entry => {
+    if (entry.seriesId !== seriesId) return;
+    getTaskDeletedDates(entry.task).forEach(deletedDate => {
+      if (deletedDate) deletedDates.add(deletedDate);
+    });
+  });
+  return deletedDates;
+};
+
 const findLatestSeriesEntry = (taskMap, seriesId) => {
   const entries = getSeriesEntries(taskMap)
     .filter(entry => entry.seriesId === seriesId)
@@ -69,10 +85,10 @@ const findLatestSeriesEntry = (taskMap, seriesId) => {
 const hasSeriesInstanceOnDate = (taskMap, seriesId, scheduledDate) => (
   getSeriesEntries(taskMap).some(entry => (
     entry.seriesId === seriesId && entry.scheduledDate === scheduledDate
-  ))
+  )) || getSeriesDeletedDates(taskMap, seriesId).has(scheduledDate)
 );
 
-const createRecurringTaskInstance = (task, scheduledDate, position) => ({
+const createRecurringTaskInstance = (task, scheduledDate, position, deletedDates = getTaskDeletedDates(task)) => ({
   ...task,
   id: genId(),
   state: "open",
@@ -82,36 +98,58 @@ const createRecurringTaskInstance = (task, scheduledDate, position) => ({
   seriesId: getTaskSeriesId(task),
   scheduledDate,
   rolloverMode: getTaskRolloverMode(task),
+  deletedDates: mergeDeletedDates(deletedDates),
 });
 
 const buildRecurringReconciliation = (taskMap, untilDate) => {
   const entriesBySeries = new Map();
 
   getSeriesEntries(taskMap).forEach(entry => {
-    if (!entriesBySeries.has(entry.seriesId)) entriesBySeries.set(entry.seriesId, []);
-    entriesBySeries.get(entry.seriesId).push(entry);
+    if (!entriesBySeries.has(entry.seriesId)) {
+      entriesBySeries.set(entry.seriesId, { entries: [], deletedDates: new Set() });
+    }
+    const seriesData = entriesBySeries.get(entry.seriesId);
+    seriesData.entries.push(entry);
+    getTaskDeletedDates(entry.task).forEach(deletedDate => {
+      if (deletedDate) seriesData.deletedDates.add(deletedDate);
+    });
   });
 
   const created = [];
   const updated = [];
 
-  entriesBySeries.forEach(seriesEntries => {
+  entriesBySeries.forEach(({ entries: seriesEntries, deletedDates }) => {
     seriesEntries.sort(compareSeriesEntries);
     let latestEntry = seriesEntries[seriesEntries.length - 1];
     if (!latestEntry) return;
 
     if (latestEntry.task.recurrence) {
-      let nextDate = nextRecurrenceDate(latestEntry.scheduledDate, latestEntry.task.recurrence);
+      let cursorDate = latestEntry.scheduledDate;
+      let templateTask = latestEntry.task;
+      let nextDate = nextRecurrenceDate(cursorDate, templateTask.recurrence);
 
       while (nextDate && nextDate <= untilDate) {
         const existing = seriesEntries.find(entry => entry.scheduledDate === nextDate);
         if (existing) {
           latestEntry = existing;
-          nextDate = nextRecurrenceDate(latestEntry.scheduledDate, latestEntry.task.recurrence);
+          templateTask = existing.task;
+          cursorDate = existing.scheduledDate;
+          nextDate = nextRecurrenceDate(cursorDate, templateTask.recurrence);
           continue;
         }
 
-        const nextTask = createRecurringTaskInstance(latestEntry.task, nextDate, 0);
+        if (deletedDates.has(nextDate)) {
+          cursorDate = nextDate;
+          nextDate = nextRecurrenceDate(cursorDate, templateTask.recurrence);
+          continue;
+        }
+
+        const nextTask = createRecurringTaskInstance(
+          templateTask,
+          nextDate,
+          0,
+          Array.from(deletedDates)
+        );
         const nextEntry = {
           task: nextTask,
           displayDate: nextDate,
@@ -122,8 +160,10 @@ const buildRecurringReconciliation = (taskMap, untilDate) => {
         seriesEntries.push(nextEntry);
         seriesEntries.sort(compareSeriesEntries);
         latestEntry = nextEntry;
+        templateTask = nextTask;
+        cursorDate = nextDate;
         created.push({ date: nextDate, task: nextTask });
-        nextDate = nextRecurrenceDate(latestEntry.scheduledDate, latestEntry.task.recurrence);
+        nextDate = nextRecurrenceDate(cursorDate, templateTask.recurrence);
       }
     }
 
@@ -138,6 +178,7 @@ const buildRecurringReconciliation = (taskMap, untilDate) => {
             ...entry.task,
             state: "skipped",
             done: false,
+            deletedDates: mergeDeletedDates(getTaskDeletedDates(entry.task), Array.from(deletedDates)),
           },
         });
       });
@@ -260,7 +301,7 @@ export function useTaskManager(user, addToast) {
     const createdUpdates = created.map(({ date, task }) => {
       const savedTask = {
         ...task,
-        position: getNextPosition(nextState[date] || []),
+        position: getNextTaskPosition(nextState[date] || []),
       };
       nextState[date] = [...(nextState[date] || []), savedTask];
       return { date, task: savedTask };
@@ -288,11 +329,21 @@ export function useTaskManager(user, addToast) {
     });
   }, [tasks, user, setTasks, withSync]);
 
-  const finalizeDelete = useCallback(async (taskId) => {
-    if (!user || user.guest) return;
+  const finalizeDelete = useCallback(async (removedTasks = [], upsertTasks = []) => {
+    if (!user || user.guest || (removedTasks.length === 0 && upsertTasks.length === 0)) return;
     const synced = await withSync(
-      async () => { await deleteTaskDB(taskId); },
-      deleteQueueOp(taskId)
+      async () => {
+        if (upsertTasks.length > 0) {
+          await Promise.all(upsertTasks.map(({ date, task }) => upsertTask(user.id, date, task)));
+        }
+        if (removedTasks.length > 0) {
+          await Promise.all(removedTasks.map(({ task }) => deleteTaskDB(task.id)));
+        }
+      },
+      [
+        ...upsertTasks.map(({ date, task }) => upsertQueueOp(date, task)),
+        ...removedTasks.map(({ task }) => deleteQueueOp(task.id)),
+      ]
     );
     if (!synced && isOnline) addToast("Error al eliminar en el servidor", "error");
   }, [user, withSync, isOnline, addToast]);
@@ -300,10 +351,10 @@ export function useTaskManager(user, addToast) {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "hidden" || !undoRef.current) return;
-      const { task, timer } = undoRef.current;
+      const { timer, removedTasks = [], upsertTasks = [] } = undoRef.current;
       clearTimeout(timer);
       undoRef.current = null;
-      void finalizeDelete(task.id);
+      void finalizeDelete(removedTasks, upsertTasks);
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -322,10 +373,8 @@ export function useTaskManager(user, addToast) {
     }, date);
     const savedTask = idx >= 0
       ? { ...normalizedTask, position: dayTasks[idx].position ?? 0 }
-      : { ...normalizedTask, position: getNextPosition(dayTasks) };
-    const newDay = idx >= 0
-      ? dayTasks.map(t => t.id === task.id ? savedTask : t)
-      : [...dayTasks, savedTask];
+      : { ...normalizedTask, position: getNextTaskPosition(dayTasks) };
+    const newDay = upsertTaskById(dayTasks, savedTask);
     setTasks({ ...currentTasks, [date]: newDay });
     if (user && !user.guest) {
       await withSync(
@@ -356,13 +405,15 @@ export function useTaskManager(user, addToast) {
     let nextTask;
     const latestSeriesEntry = findLatestSeriesEntry(currentTasks, seriesId);
     const isLatestSeriesTask = !latestSeriesEntry || latestSeriesEntry.task.id === task.id;
+    const seriesDeletedDates = Array.from(getSeriesDeletedDates(currentTasks, seriesId));
     if (isTaskDone(updatedTask) && task.recurrence && isLatestSeriesTask) {
       nextDate = nextRecurrenceDate(scheduledDate, task.recurrence);
       if (nextDate && !hasSeriesInstanceOnDate(currentTasks, seriesId, nextDate)) {
         nextTask = createRecurringTaskInstance(
           task,
           nextDate,
-          getNextPosition(currentTasks[nextDate] || [])
+          getNextTaskPosition(currentTasks[nextDate] || []),
+          seriesDeletedDates
         );
       }
     }
@@ -390,31 +441,81 @@ export function useTaskManager(user, addToast) {
     }
   }, [user, setTasks, withSync, addToast]);
 
-  const handleDelete = useCallback((date, id) => {
+  const handleDelete = useCallback((date, id, mode = TASK_DELETE_MODES.SINGLE) => {
     const currentTasks = tasksRef.current;
-    const task = currentTasks[date]?.find(t => t.id === id);
-    if (!task) return;
-    setTasks({ ...currentTasks, [date]: (currentTasks[date] || []).filter(t => t.id !== id) });
-    if (undoRef.current) clearTimeout(undoRef.current.timer);
-    const undoData = { date, task, timer: null };
+    const deletePlan = buildTaskDeletePlan(currentTasks, date, id, mode);
+    if (!deletePlan) return;
+
+    setTasks(deletePlan.nextState);
+    deletePlan.addedTasks.forEach(({ date: targetDate, task }) => {
+      if (isTaskOpen(task)) scheduleNotification(task, targetDate);
+    });
+
+    if (undoRef.current) {
+      const { timer, removedTasks: pendingRemovedTasks = [], upsertTasks: pendingUpsertTasks = [] } = undoRef.current;
+      clearTimeout(timer);
+      undoRef.current = null;
+      void finalizeDelete(pendingRemovedTasks, pendingUpsertTasks);
+    }
+    const undoData = {
+      removedTasks: deletePlan.removedTasks,
+      addedTasks: deletePlan.addedTasks,
+      rollbackUpdates: deletePlan.rollbackUpdates,
+      upsertTasks: deletePlan.upsertTasks,
+      timer: null,
+    };
     undoRef.current = undoData;
-    addToast("Tarea eliminada", "info", {
+    addToast(getTaskDeleteToastMessage(deletePlan.targetTask, deletePlan.mode), "info", {
       label: "Deshacer",
       fn: () => {
         if (undoRef.current !== undoData) return;
         clearTimeout(undoData.timer);
         undoRef.current = null;
         setTasks(prevTasks => {
-          const restored = [...(prevTasks[date] || []), task].sort(byPosition);
-          return { ...prevTasks, [date]: restored };
+          let restoredState = prevTasks;
+
+          if (undoData.addedTasks.length > 0) {
+            const addedTaskIds = new Set(undoData.addedTasks.map(({ task }) => task.id));
+            restoredState = Object.fromEntries(
+              Object.entries(restoredState).map(([entryDate, dayTasks]) => [
+                entryDate,
+                dayTasks.filter(currentTask => !addedTaskIds.has(currentTask.id)),
+              ])
+            );
+          }
+
+          if (undoData.rollbackUpdates.length > 0) {
+            restoredState = undoData.rollbackUpdates.reduce((nextState, { date: entryDate, task }) => (
+              replaceTasksForDate(
+                nextState,
+                entryDate,
+                replaceTaskById(nextState[entryDate] || [], normalizeTask(task, entryDate))
+              )
+            ), restoredState);
+          }
+
+          return undoData.removedTasks.reduce((nextState, { date: entryDate, task }) => (
+            replaceTasksForDate(
+              nextState,
+              entryDate,
+              [...(nextState[entryDate] || []), task].sort(byPosition)
+            )
+          ), restoredState);
         });
-        addToast("Tarea restaurada", "success", null, TIMINGS.HIGHLIGHT_DURATION);
+        addToast(
+          undoData.removedTasks.length > 1 || undoData.addedTasks.length > 0 || undoData.rollbackUpdates.length > 0
+            ? "Cambios restaurados"
+            : "Tarea restaurada",
+          "success",
+          null,
+          TIMINGS.HIGHLIGHT_DURATION
+        );
       }
     }, TIMINGS.UNDO_WINDOW);
     undoData.timer = setTimeout(() => {
       if (undoRef.current !== undoData) return;
       undoRef.current = null;
-      void finalizeDelete(id);
+      void finalizeDelete(deletePlan.removedTasks, deletePlan.upsertTasks);
     }, TIMINGS.UNDO_WINDOW);
   }, [setTasks, addToast, finalizeDelete]);
 
@@ -426,10 +527,11 @@ export function useTaskManager(user, addToast) {
       id,
       state: "open",
       done: false,
-      position: getNextPosition(dayTasks),
+      position: getNextTaskPosition(dayTasks),
       seriesId: id,
       scheduledDate: date,
       rolloverMode: getTaskRolloverMode(task),
+      deletedDates: [],
       subtasks: (task.subtasks || []).map(s => ({ ...s, id: genId(), done: false })),
     };
     await persistTask(date, newTask);
@@ -443,7 +545,7 @@ export function useTaskManager(user, addToast) {
     if (!task) return;
     const movedTask = normalizeTask({
       ...task,
-      position: getNextPosition(currentTasks[toDate] || []),
+      position: getNextTaskPosition(currentTasks[toDate] || []),
       seriesId: getTaskSeriesId(task),
       scheduledDate: toDate,
     }, toDate);
@@ -460,8 +562,8 @@ export function useTaskManager(user, addToast) {
   }, [user, setTasks, withSync]);
 
   const handleReorder = useCallback(async (date, reorderedTasks) => {
-    const withPositions = reorderedTasks.map((t, i) => ({ ...t, position: i }));
-    setTasks(prevTasks => ({ ...prevTasks, [date]: withPositions }));
+    const withPositions = assignOrderedTaskPositions(reorderedTasks);
+    setTasks(prevTasks => replaceTasksForDate(prevTasks, date, withPositions));
     if (user && !user.guest) {
       await withSync(
         async () => { await batchUpsertPositions(user.id, date, withPositions); },
@@ -497,7 +599,7 @@ export function useTaskManager(user, addToast) {
     const updates = [];
     const newTasks = {};
     const todayTasks = [...(currentTasks[todayDate] || [])];
-    let position = getNextPosition(todayTasks) || 0;
+    let position = getNextTaskPosition(todayTasks) || 0;
     Object.entries(currentTasks).forEach(([date, dayTasks]) => {
       if (date >= todayDate) {
         newTasks[date] = dayTasks;
@@ -553,15 +655,10 @@ export function useTaskManager(user, addToast) {
     const task = dayTasks.find(t => t.id === taskId);
     if (!task) return;
     if (!isTaskOpen(task)) return;
-    const updatedTask = normalizeTask({
-      ...task,
-      subtasks: (task.subtasks || []).map(subtask => (
-        subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask
-      )),
-    }, date);
+    const updatedTask = normalizeTask(withToggledSubtask(task, subtaskId), date);
     setTasks({
       ...currentTasks,
-      [date]: dayTasks.map(currentTask => currentTask.id === taskId ? updatedTask : currentTask),
+      [date]: replaceTaskById(dayTasks, updatedTask),
     });
     if (user && !user.guest) {
       await withSync(

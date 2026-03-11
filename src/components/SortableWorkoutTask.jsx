@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { T } from "../theme";
 import { getPriorityColor } from "../constants";
+import { getChecklistMeta } from "../checklist";
 import {
   getRecurrenceLabel,
   getScheduledDateBadge,
@@ -65,12 +66,16 @@ export default function SortableWorkoutTask({
   });
   const cardRef = useRef(null);
   const isHighlighted = highlightedTaskId === task.id;
-  const exercises = task.subtasks || [];
-  const exercisesDone = exercises.filter(s => s.done).length;
-  const exercisesTotal = exercises.length;
-  const openExercises = exercises.filter(s => !s.done);
-  const doneExercises = exercises.filter(s => s.done);
+  const exercisesMeta = getChecklistMeta(task.subtasks);
+  const exercisesDone = exercisesMeta.completed;
+  const exercisesTotal = exercisesMeta.total;
+  const openExercises = exercisesMeta.pendingItems;
+  const doneExercises = exercisesMeta.completedItems;
   const scheduledBadge = getScheduledDateBadge(getTaskScheduledDate(task, date), date);
+  const exercisesPreviewLabel = exercisesMeta.pending > 0 ? "Siguiente" : "Rutina";
+  const exercisesPreviewSuffix = exercisesMeta.remainingPreviewCount > 0
+    ? ` +${exercisesMeta.remainingPreviewCount}`
+    : "";
 
   useEffect(() => {
     if (isHighlighted && cardRef.current) {
@@ -151,14 +156,51 @@ export default function SortableWorkoutTask({
                   setExpanded(prev => !prev);
                 }}
                 style={{
-                  marginTop: ".35rem", background: "none", border: "none", padding: 0,
-                  color: T.textMuted, fontSize: ".76rem", cursor: "pointer",
+                  marginTop: ".45rem",
+                  background: isOpen ? T.gymLight : T.doneBg,
+                  border: `1px solid ${isOpen ? T.gymBorder : T.borderGray}`,
+                  borderRadius: "999px",
+                  padding: ".22rem .55rem",
+                  color: isOpen ? T.gymDark : T.textMuted,
+                  fontSize: ".76rem", cursor: "pointer",
                   display: "inline-flex", alignItems: "center", gap: ".35rem",
                 }}
               >
                 {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 {exercisesDone}/{exercisesTotal} ejercicios
               </button>
+            )}
+
+            {exercisesTotal > 0 && !expanded && exercisesMeta.previewText && (
+              <div style={{
+                marginTop: ".4rem",
+                display: "flex",
+                alignItems: "center",
+                gap: ".45rem",
+                minWidth: 0,
+              }}>
+                <span style={{
+                  flexShrink: 0,
+                  fontSize: ".68rem",
+                  fontWeight: 700,
+                  color: isOpen ? T.gymDark : T.textMuted,
+                  textTransform: "uppercase",
+                  letterSpacing: ".04em",
+                }}>
+                  {exercisesPreviewLabel}
+                </span>
+                <span style={{
+                  minWidth: 0,
+                  fontSize: ".76rem",
+                  color: T.textMuted,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}>
+                  {exercisesMeta.previewText}
+                  {exercisesPreviewSuffix}
+                </span>
+              </div>
             )}
           </div>
         </div>

@@ -7,7 +7,8 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS scheduled_date text;
 UPDATE tasks
 SET
   series_id = COALESCE(series_id, id),
-  scheduled_date = COALESCE(scheduled_date, date);
+  scheduled_date = COALESCE(scheduled_date, date)
+WHERE series_id IS NULL OR scheduled_date IS NULL;
 
 ALTER TABLE tasks ALTER COLUMN series_id SET NOT NULL;
 ALTER TABLE tasks ALTER COLUMN scheduled_date SET NOT NULL;

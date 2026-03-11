@@ -7,7 +7,19 @@
       "Bash(timeout 8 npx vite:*)",
       "Bash(npm uninstall:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(npx vite build)",
+      "Bash(taskkill:*)",
+      "WebFetch(domain:agenda-wine-gamma.vercel.app)",
+      "Bash(npm run build:*)",
+      "Bash(npm ls:*)",
+      "Bash(__NEW_LINE_a72c6cb75efaee49__ echo \"=== Checking for unused React imports ===\")",
+      "Bash(__NEW_LINE_71741db1f1a6f8a8__ echo \"\")",
+      "Bash(wc -l:*)"
     ]
   }
 }

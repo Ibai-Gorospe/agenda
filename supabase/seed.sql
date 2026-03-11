@@ -1,0 +1,2 @@
+-- Intentionally empty.
+-- Keep this file so `supabase/config.toml` references a real seed path.

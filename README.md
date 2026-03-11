@@ -119,11 +119,13 @@ Ejecuta estos scripts en el SQL Editor de Supabase, en este orden:
    Anade `series_id` y `scheduled_date` para distinguir instancias recurrentes atrasadas de la tarea del dia actual.
 4. `supabase_task_state_rollover.sql`
    Anade `state` y `rollover_mode` para separar tareas abiertas, hechas y omitidas, y definir si una recurrencia se arrastra o queda anclada.
-5. `supabase_weight_logs.sql`
+5. `supabase_task_deleted_dates.sql`
+   Anade `deleted_dates` para recordar ocurrencias recurrentes borradas y evitar que se regeneren solas.
+6. `supabase_weight_logs.sql`
    Crea `weight_logs`.
-6. `supabase_user_settings.sql`
+7. `supabase_user_settings.sql`
    Crea `user_settings` para el objetivo de peso.
-7. `supabase_email_notifications.sql`
+8. `supabase_email_notifications.sql`
    Crea `email_notification_log` para evitar duplicados en emails.
 
 ### 4. Desarrollo local

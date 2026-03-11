@@ -12,6 +12,7 @@ const mapTaskRow = (t) => ({
   seriesId: t.series_id || t.id,
   scheduledDate: t.scheduled_date || t.date,
   rolloverMode: t.rollover_mode || (t.category === "gym" ? "anchor" : "carry"),
+  deletedDates: t.deleted_dates || [],
 });
 
 export async function fetchTasks(userId) {
@@ -50,6 +51,7 @@ export async function upsertTask(userId, date, task) {
     series_id: task.seriesId || task.id,
     scheduled_date: task.scheduledDate || date,
     rollover_mode: getTaskRolloverMode(task),
+    deleted_dates: task.deletedDates || [],
   });
   if (error) throw new Error("Error al guardar tarea");
 }
@@ -74,6 +76,7 @@ export async function batchUpsertPositions(userId, date, tasks) {
     series_id: t.seriesId || t.id,
     scheduled_date: t.scheduledDate || date,
     rollover_mode: getTaskRolloverMode(t),
+    deleted_dates: t.deletedDates || [],
   }));
   const { error } = await supabase.from("tasks").upsert(rows);
   if (error) throw new Error("Error al reordenar tareas");

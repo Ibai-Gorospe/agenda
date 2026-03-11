@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { T } from "../theme";
 import { getCat, getPriorityColor } from "../constants";
+import { getChecklistMeta } from "../checklist";
 import {
   getRecurrenceLabel,
   getScheduledDateBadge,
@@ -67,12 +68,16 @@ export default function SortableTask({
   const isHighlighted = highlightedTaskId === task.id;
   const cat = task.category ? getCat(task.category) : null;
   const priorityColor = getPriorityColor(task.priority);
-  const subtasks = task.subtasks || [];
-  const subtasksDone = subtasks.filter(s => s.done).length;
-  const subtasksTotal = subtasks.length;
-  const openSubtasks = subtasks.filter(s => !s.done);
-  const doneSubtasks = subtasks.filter(s => s.done);
+  const subtasksMeta = getChecklistMeta(task.subtasks);
+  const subtasksDone = subtasksMeta.completed;
+  const subtasksTotal = subtasksMeta.total;
+  const openSubtasks = subtasksMeta.pendingItems;
+  const doneSubtasks = subtasksMeta.completedItems;
   const scheduledBadge = getScheduledDateBadge(getTaskScheduledDate(task, date), date);
+  const checklistPreviewLabel = subtasksMeta.pending > 0 ? "Pendiente" : "Checklist";
+  const checklistPreviewSuffix = subtasksMeta.remainingPreviewCount > 0
+    ? ` +${subtasksMeta.remainingPreviewCount}`
+    : "";
 
   useEffect(() => {
     if (isHighlighted && cardRef.current) {
@@ -158,14 +163,51 @@ export default function SortableTask({
                   setExpanded(prev => !prev);
                 }}
                 style={{
-                  marginTop: ".35rem", background: "none", border: "none", padding: 0,
-                  color: T.textMuted, fontSize: ".76rem", cursor: "pointer",
+                  marginTop: ".45rem",
+                  background: isOpen ? T.accentLight : T.doneBg,
+                  border: `1px solid ${isOpen ? T.border : T.borderGray}`,
+                  borderRadius: "999px",
+                  padding: ".22rem .55rem",
+                  color: isOpen ? T.accentDark : T.textMuted,
+                  fontSize: ".76rem", cursor: "pointer",
                   display: "inline-flex", alignItems: "center", gap: ".35rem",
                 }}
               >
                 {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 {subtasksDone}/{subtasksTotal} subtareas
               </button>
+            )}
+
+            {subtasksTotal > 0 && !expanded && subtasksMeta.previewText && (
+              <div style={{
+                marginTop: ".4rem",
+                display: "flex",
+                alignItems: "center",
+                gap: ".45rem",
+                minWidth: 0,
+              }}>
+                <span style={{
+                  flexShrink: 0,
+                  fontSize: ".68rem",
+                  fontWeight: 700,
+                  color: isOpen ? T.accentDark : T.textMuted,
+                  textTransform: "uppercase",
+                  letterSpacing: ".04em",
+                }}>
+                  {checklistPreviewLabel}
+                </span>
+                <span style={{
+                  minWidth: 0,
+                  fontSize: ".76rem",
+                  color: T.textMuted,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}>
+                  {subtasksMeta.previewText}
+                  {checklistPreviewSuffix}
+                </span>
+              </div>
             )}
           </div>
         </div>

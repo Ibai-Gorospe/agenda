@@ -18,6 +18,8 @@ export const getTaskSeriesId = (task) => task?.seriesId || task?.id || null;
 
 export const getTaskScheduledDate = (task, fallbackDate = "") => task?.scheduledDate || fallbackDate;
 
+export const getTaskDeletedDates = (task) => Array.isArray(task?.deletedDates) ? task.deletedDates : [];
+
 export const getTaskState = (task) => {
   if (task?.state === "done" || task?.state === "open" || task?.state === "skipped") return task.state;
   return task?.done ? "done" : "open";
@@ -41,6 +43,7 @@ export const normalizeTask = (task, fallbackDate = "") => ({
   rolloverMode: getTaskRolloverMode(task),
   seriesId: getTaskSeriesId(task),
   scheduledDate: getTaskScheduledDate(task, fallbackDate),
+  deletedDates: getTaskDeletedDates(task),
 });
 
 export const isWeekend = (dateStr) => {

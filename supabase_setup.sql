@@ -18,6 +18,7 @@ create table tasks (
   state text default 'open',
   series_id text not null,
   scheduled_date text not null,
+  deleted_dates jsonb default '[]'::jsonb,
   created_at timestamp with time zone default now()
 );
 

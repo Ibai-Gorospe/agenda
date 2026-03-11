@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import { T } from "../theme";
 import { Scale, BarChart3, ChevronUp, ChevronDown, Check, X, Trash2, Target } from "lucide-react";
-import { pad, formatDateLabel } from "../helpers";
+import { formatDateLabel } from "../helpers";
 import { fetchWeightLogs, upsertWeightLog, fetchWeightGoal, upsertWeightGoal, deleteWeightLog } from "../api/weightLogs";
+import { buildWeightChartData, deriveWeightInsights } from "../weightHelpers";
 
 function WeightView({ user, today, onCreateAccount }) {
   const [logs, setLogs] = useState([]);
@@ -18,6 +19,7 @@ function WeightView({ user, today, onCreateAccount }) {
   const [chartRange, setChartRange] = useState(30);
   const [confirmDeleteDate, setConfirmDeleteDate] = useState(null);
   const isGuest = user?.guest;
+  const referenceDate = useMemo(() => new Date(`${today}T12:00:00`), [today]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,71 +142,20 @@ function WeightView({ user, today, onCreateAccount }) {
   const hasExisting = logs.some(l => l.date === selectedDate);
   const isToday = selectedDate === today;
 
-  // --- Stats: nearest entry instead of exact match ---
-  const findNearest = (targetDate, maxDaysDiff = 3) => {
-    const target = new Date(targetDate + "T00:00:00").getTime();
-    let closest = null;
-    let minDiff = Infinity;
-    for (const l of logs) {
-      const d = new Date(l.date + "T00:00:00").getTime();
-      const diff = Math.abs(d - target);
-      if (diff < minDiff && diff <= maxDaysDiff * 86400000) {
-        minDiff = diff;
-        closest = l;
-      }
-    }
-    return closest;
-  };
-
-  const currentKg = logs.length > 0 ? logs[logs.length - 1].weight_kg : null;
-
-  const weekAgoStr = (() => {
-    const d = new Date(); d.setDate(d.getDate() - 7);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  })();
-  const monthAgoStr = (() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  })();
-  const weekAgoEntry = findNearest(weekAgoStr);
-  const monthAgoEntry = findNearest(monthAgoStr, 5);
-  const weekChange = currentKg != null && weekAgoEntry ? currentKg - weekAgoEntry.weight_kg : null;
-  const monthChange = currentKg != null && monthAgoEntry ? currentKg - monthAgoEntry.weight_kg : null;
-
-  // Streak
-  let streak = 0;
-  { const d = new Date();
-    while (true) {
-      const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      if (logs.some(l => l.date === ds)) { streak++; d.setDate(d.getDate() - 1); } else break;
-    }
-  }
-
-  // Period stats
-  const periodLogs = (() => {
-    if (chartRange === 0) return logs;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - chartRange);
-    const cutoffStr = `${cutoff.getFullYear()}-${pad(cutoff.getMonth() + 1)}-${pad(cutoff.getDate())}`;
-    return logs.filter(l => l.date >= cutoffStr);
-  })();
-  const periodMin = periodLogs.length > 0 ? Math.min(...periodLogs.map(l => l.weight_kg)) : null;
-  const periodMax = periodLogs.length > 0 ? Math.max(...periodLogs.map(l => l.weight_kg)) : null;
-  const periodAvg = periodLogs.length > 0 ? periodLogs.reduce((s, l) => s + l.weight_kg, 0) / periodLogs.length : null;
-
-  // Goal progress
-  const goalProgress = (() => {
-    if (!goalWeight || logs.length < 2) return null;
-    const first = logs[0].weight_kg;
-    const current = logs[logs.length - 1].weight_kg;
-    const totalNeeded = first - goalWeight;
-    if (Math.abs(totalNeeded) < 0.1) return null;
-    const achieved = first - current;
-    const pct = Math.min(Math.max((achieved / totalNeeded) * 100, 0), 100);
-    const remaining = Math.abs(current - goalWeight);
-    const reached = (totalNeeded > 0 && current <= goalWeight) || (totalNeeded < 0 && current >= goalWeight);
-    return { pct, remaining, reached };
-  })();
+  const {
+    weekChange,
+    monthChange,
+    streak,
+    periodMin,
+    periodMax,
+    periodAvg,
+    goalProgress,
+  } = deriveWeightInsights({
+    logs,
+    chartRange,
+    goalWeight,
+    referenceDate,
+  });
 
   // Motivational message
   const getMessage = () => {
@@ -355,7 +306,7 @@ function WeightView({ user, today, onCreateAccount }) {
           )}
 
           {/* Chart with range selector */}
-          <WeightChart logs={logs} goalWeight={goalWeight} today={today} range={chartRange} />
+          <WeightChart logs={logs} goalWeight={goalWeight} referenceDate={referenceDate} range={chartRange} />
           <div style={{
             display: "flex", justifyContent: "center", gap: ".4rem",
             marginTop: "-0.6rem", marginBottom: "1rem",
@@ -590,83 +541,13 @@ function StatCard({ label, value, type = "change" }) {
 
 // ─── Chart sub-component ─────────────────────────────────────────────────────
 
-function WeightChart({ logs, goalWeight, today, range }) {
-  const chartData = useMemo(() => {
-    let days;
-    if (range === 0) {
-      // All time
-      if (logs.length === 0) return null;
-      const first = new Date(logs[0].date + "T00:00:00");
-      const last = new Date();
-      days = Math.max(Math.ceil((last - first) / 86400000) + 1, 7);
-    } else {
-      days = range;
-    }
-
-    const dates = Array.from({ length: days }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    });
-    const pts = dates.map(dt => { const l = logs.find(x => x.date === dt); return l ? l.weight_kg : null; });
-    const valid = pts.filter(v => v !== null);
-    if (valid.length < 2) return null;
-
-    const movAvgWindow = 7;
-    const movAvg = pts.map((_, i) => {
-      const w = pts.slice(Math.max(0, i - movAvgWindow + 1), i + 1).filter(v => v !== null);
-      return w.length >= 1 ? w.reduce((a, b) => a + b, 0) / w.length : null;
-    });
-
-    const CW = 560, CH = 220, PL = 45, PT = 15, PB = 28, PRt = 15;
-    const gW = CW - PL - PRt, gH = CH - PT - PB;
-    const allVals = [...valid];
-    if (goalWeight) allVals.push(goalWeight);
-    const lo = Math.min(...allVals) - 0.5;
-    const hi = Math.max(...allVals) + 0.5;
-    const rng = Math.max(hi - lo, 1);
-    const xOf = (i) => PL + (i / (days - 1)) * gW;
-    const yOf = (v) => PT + gH - ((v - lo) / rng) * gH;
-
-    // Catmull-Rom smooth
-    const smooth = (arr) => {
-      if (arr.length < 2) return "";
-      let d = `M${arr[0].x.toFixed(1)},${arr[0].y.toFixed(1)}`;
-      if (arr.length === 2) return d + `L${arr[1].x.toFixed(1)},${arr[1].y.toFixed(1)}`;
-      for (let i = 0; i < arr.length - 1; i++) {
-        const p0 = arr[Math.max(0, i - 1)], p1 = arr[i], p2 = arr[i + 1], p3 = arr[Math.min(arr.length - 1, i + 2)];
-        d += `C${(p1.x + (p2.x - p0.x) / 6).toFixed(1)},${(p1.y + (p2.y - p0.y) / 6).toFixed(1)},${(p2.x - (p3.x - p1.x) / 6).toFixed(1)},${(p2.y - (p3.y - p1.y) / 6).toFixed(1)},${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-      }
-      return d;
-    };
-
-    const segs = []; let sg = [];
-    pts.forEach((v, i) => { if (v != null) sg.push({ x: xOf(i), y: yOf(v) }); else { if (sg.length >= 2) segs.push(sg); sg = []; } });
-    if (sg.length >= 2) segs.push(sg);
-
-    const dots = pts.map((v, i) => v != null ? { x: xOf(i), y: yOf(v) } : null).filter(Boolean);
-    const avgPts = movAvg.map((v, i) => v != null ? { x: xOf(i), y: yOf(v) } : null).filter(Boolean);
-    const yTicks = Array.from({ length: 5 }, (_, i) => lo + (rng * i) / 4);
-
-    // Adaptive x-axis labels (always ~5 labels)
-    const labelCount = 5;
-    const step = Math.max(1, Math.floor((days - 1) / (labelCount - 1)));
-    const xLabels = [];
-    for (let i = 0; i < labelCount; i++) {
-      const idx = Math.min(i * step, days - 1);
-      const dt = dates[idx];
-      let label;
-      if (days <= 60) {
-        label = dt.slice(5).replace("-", "/");
-      } else {
-        const d = new Date(dt + "T00:00:00");
-        label = d.toLocaleDateString("es-ES", { month: "short" }).replace(".", "");
-        if (days > 365) label += " " + dt.slice(2, 4);
-      }
-      xLabels.push({ x: xOf(idx), label });
-    }
-
-    return { CW, CH, PL, PRt, segs, dots, avgPts, yTicks, xLabels, smooth, yOf, goalWeight, days };
-  }, [logs, goalWeight, range]);
+function WeightChart({ logs, goalWeight, referenceDate, range }) {
+  const chartData = useMemo(() => buildWeightChartData({
+    logs,
+    goalWeight,
+    range,
+    referenceDate,
+  }), [logs, goalWeight, range, referenceDate]);
 
   if (!chartData) return null;
   const { CW, CH, PL, PRt, segs, dots, avgPts, yTicks, xLabels, smooth, yOf, days } = chartData;
