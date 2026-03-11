@@ -282,8 +282,15 @@ export function useTaskManager(user, addToast, materializeUntilDate = null) {
       await fn();
       return true;
     } catch (err) {
+      if (import.meta.env.DEV && import.meta.env.MODE !== "test") {
+        console.error("[useTaskManager] sync error", {
+          message: err?.message,
+          queueOps: ops,
+          isOnline,
+        });
+      }
       if (ops.length) enqueueMany(ops);
-      else addToast(err.message || "Error de sincronización", "error");
+      if (isOnline) addToast(err.message || "Error de sincronizacion", "error");
       return false;
     } finally {
       setSyncing(false);
