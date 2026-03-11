@@ -39,8 +39,8 @@ const setOnline = () => {
   Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
 };
 
-const renderTaskManager = async (user = { id: "user-1" }, addToast = vi.fn()) => {
-  const rendered = renderHook(() => useTaskManager(user, addToast));
+const renderTaskManager = async (user = { id: "user-1" }, addToast = vi.fn(), materializeUntilDate = null) => {
+  const rendered = renderHook(() => useTaskManager(user, addToast, materializeUntilDate));
   await act(async () => { await Promise.resolve(); });
   act(() => {
     window.dispatchEvent(new Event("offline"));
@@ -48,9 +48,9 @@ const renderTaskManager = async (user = { id: "user-1" }, addToast = vi.fn()) =>
   return rendered;
 };
 
-const renderOnlineTaskManager = async (user = { id: "user-1" }, addToast = vi.fn()) => {
+const renderOnlineTaskManager = async (user = { id: "user-1" }, addToast = vi.fn(), materializeUntilDate = null) => {
   setOnline();
-  const rendered = renderHook(() => useTaskManager(user, addToast));
+  const rendered = renderHook(() => useTaskManager(user, addToast, materializeUntilDate));
   await act(async () => { await Promise.resolve(); });
   return rendered;
 };
@@ -228,6 +228,59 @@ describe("useTaskManager", () => {
     ]);
   });
 
+  it("materializes future daily occurrences inside the visible horizon", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-11T12:00:00"));
+    const { result } = await renderTaskManager({ id: "user-1" }, vi.fn(), "2026-03-14");
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-11": [{
+          id: "task-1",
+          text: "Creatina",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-11",
+        }],
+      });
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.tasks["2026-03-12"][0]).toEqual(expect.objectContaining({ scheduledDate: "2026-03-12" }));
+    expect(result.current.tasks["2026-03-13"][0]).toEqual(expect.objectContaining({ scheduledDate: "2026-03-13" }));
+    expect(result.current.tasks["2026-03-14"][0]).toEqual(expect.objectContaining({ scheduledDate: "2026-03-14" }));
+    expect(result.current.tasks["2026-03-15"]).toBeUndefined();
+  });
+
+  it("materializes custom weekday recurrences in the matching future days", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-09T12:00:00"));
+    const { result } = await renderTaskManager({ id: "user-1" }, vi.fn(), "2026-03-15");
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-09": [{
+          id: "task-1",
+          text: "Rutina",
+          done: false,
+          recurrence: "days:1,2,3,6",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-09",
+        }],
+      });
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.tasks["2026-03-10"][0]).toEqual(expect.objectContaining({ scheduledDate: "2026-03-10" }));
+    expect(result.current.tasks["2026-03-11"][0]).toEqual(expect.objectContaining({ scheduledDate: "2026-03-11" }));
+    expect(result.current.tasks["2026-03-14"][0]).toEqual(expect.objectContaining({ scheduledDate: "2026-03-14" }));
+    expect(result.current.tasks["2026-03-12"]).toBeUndefined();
+    expect(result.current.tasks["2026-03-15"]).toBeUndefined();
+  });
+
   it("excludes anchor tasks from past pending selectors", async () => {
     const { result } = await renderTaskManager();
     vi.useFakeTimers();
@@ -280,6 +333,42 @@ describe("useTaskManager", () => {
     expect(result.current.tasks["2026-03-11"][0]).toEqual(expect.objectContaining({
       state: "open",
       scheduledDate: "2026-03-11",
+    }));
+  });
+
+  it("does not skip today's anchor task just because future occurrences are materialized", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-11T12:00:00"));
+    const { result } = await renderTaskManager({ id: "user-1" }, vi.fn(), "2026-03-13");
+
+    act(() => {
+      result.current.setTasks({
+        "2026-03-11": [{
+          id: "task-1",
+          text: "Gym",
+          done: false,
+          recurrence: "daily",
+          position: 0,
+          seriesId: "series-1",
+          scheduledDate: "2026-03-11",
+          rolloverMode: "anchor",
+        }],
+      });
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.tasks["2026-03-11"][0]).toEqual(expect.objectContaining({
+      state: "open",
+      rolloverMode: "anchor",
+      scheduledDate: "2026-03-11",
+    }));
+    expect(result.current.tasks["2026-03-12"][0]).toEqual(expect.objectContaining({
+      state: "open",
+      scheduledDate: "2026-03-12",
+    }));
+    expect(result.current.tasks["2026-03-13"][0]).toEqual(expect.objectContaining({
+      state: "open",
+      scheduledDate: "2026-03-13",
     }));
   });
 

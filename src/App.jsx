@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { T, GLOBAL_CSS } from "./theme";
 import { MONTHS_ES, TIMINGS } from "./constants";
 import { Sun, Moon, BarChart3, Search, ChevronLeft, ChevronRight, WifiOff, AlertTriangle } from "lucide-react";
@@ -54,6 +54,15 @@ export default function App() {
   } = useNavigation();
   const { toasts, addToast, dismissToast } = useToast();
   const { darkMode, toggleDarkMode } = useTheme();
+  const materializeUntilDate = useMemo(() => {
+    if (activeView === "day") return selectedDate;
+    if (activeView === "week") return dateAdd(weekStart, 6);
+    if (activeView === "month") {
+      const monthEnd = new Date(calYear, calMonth + 1, 0);
+      return `${monthEnd.getFullYear()}-${String(monthEnd.getMonth() + 1).padStart(2, "0")}-${String(monthEnd.getDate()).padStart(2, "0")}`;
+    }
+    return today;
+  }, [activeView, selectedDate, weekStart, calYear, calMonth, today]);
   const {
     tasks, setTasks, syncing, tasksLoading, isOnline,
     dismissedPendingBanner, setDismissedPendingBanner,
@@ -62,7 +71,7 @@ export default function App() {
     moveTask, handleReorder, toggleSubtask,
     pendingPastCount, pendingPastTasks,
     moveAllPendingToToday, moveSelectedPendingToToday,
-  } = useTaskManager(user, addToast);
+  } = useTaskManager(user, addToast, materializeUntilDate);
   const [modal, setModal] = useState(null);
   const [movePicker, setMovePicker] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);

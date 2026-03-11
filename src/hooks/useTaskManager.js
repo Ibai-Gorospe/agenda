@@ -101,7 +101,7 @@ const createRecurringTaskInstance = (task, scheduledDate, position, deletedDates
   deletedDates: mergeDeletedDates(deletedDates),
 });
 
-const buildRecurringReconciliation = (taskMap, untilDate) => {
+const buildRecurringReconciliation = (taskMap, untilDate, stateUntilDate = untilDate) => {
   const entriesBySeries = new Map();
 
   getSeriesEntries(taskMap).forEach(entry => {
@@ -167,9 +167,14 @@ const buildRecurringReconciliation = (taskMap, untilDate) => {
       }
     }
 
-    if (latestEntry.scheduledDate) {
+    const latestRelevantEntry = [...seriesEntries]
+      .filter(entry => entry.scheduledDate <= stateUntilDate)
+      .sort(compareSeriesEntries)
+      .at(-1);
+
+    if (latestRelevantEntry?.scheduledDate) {
       seriesEntries.forEach(entry => {
-        if (entry.scheduledDate >= latestEntry.scheduledDate) return;
+        if (entry.scheduledDate >= latestRelevantEntry.scheduledDate) return;
         if (getTaskRolloverMode(entry.task) !== "anchor") return;
         if (!isTaskOpen(entry.task)) return;
         updated.push({
@@ -198,7 +203,7 @@ const buildRecurringReconciliation = (taskMap, untilDate) => {
   };
 };
 
-export function useTaskManager(user, addToast) {
+export function useTaskManager(user, addToast, materializeUntilDate = null) {
   const [tasks, setTasksState] = useState({});
   const [syncing, setSyncing] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -288,7 +293,11 @@ export function useTaskManager(user, addToast) {
   useEffect(() => {
     if (materializingRef.current) return;
 
-    const { created, updated } = buildRecurringReconciliation(tasksRef.current, todayStr());
+    const todayDate = todayStr();
+    const horizonEnd = materializeUntilDate && materializeUntilDate > todayDate
+      ? materializeUntilDate
+      : todayDate;
+    const { created, updated } = buildRecurringReconciliation(tasksRef.current, horizonEnd, todayDate);
     if (created.length === 0 && updated.length === 0) return;
 
     const nextState = { ...tasksRef.current };
@@ -327,7 +336,7 @@ export function useTaskManager(user, addToast) {
     void persistMissing().finally(() => {
       materializingRef.current = false;
     });
-  }, [tasks, user, setTasks, withSync]);
+  }, [tasks, user, setTasks, withSync, materializeUntilDate]);
 
   const finalizeDelete = useCallback(async (removedTasks = [], upsertTasks = []) => {
     if (!user || user.guest || (removedTasks.length === 0 && upsertTasks.length === 0)) return;
